@@ -1,11 +1,11 @@
-modules = ["python-3.12"]
+modules = ["python-3.12", "cpp-clang14", "c-clang14", "web"]
 run = "python -m streamlit run main.py"
 
 [nix]
-channel = "stable-23_11"
+channel = "stable-24_05"
 
 [deployment]
-run = ["sh", "-c", "echo \"\" | python -m streamlit run main.py"]
+run = ["sh", "-c", "python -m streamlit run main.py"]
 deploymentTarget = "cloudrun"
 
 [[ports]]

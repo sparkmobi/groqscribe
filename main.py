@@ -10,7 +10,8 @@ from notes import GenerationStatistics, NoteSection, generate_notes_structure, g
 
 load_dotenv()
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", None)
+GROQ_API_KEY = os.environ.get(
+    "GROQ_API_KEY", "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")
 
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
 FILE_TOO_LARGE_MESSAGE = "The audio file is too large for the current size and rate limits using Whisper. If you used a YouTube link, please try a shorter video clip. If you uploaded an audio file, try trimming or compressing the audio to under 25 MB."
@@ -74,11 +75,11 @@ try:
         }
 
         st.write(
-            f"# 🗒️ GroqNotes \n## Generate notes from audio in seconds using Groq, Whisper, and Llama3"
+            f"# 🗒️ GroqTranscribe \n## Generate notes from audio in seconds using Groq"
         )
-        st.markdown(
-            f"[Github Repository](https://github.com/bklieger/groqnotes)\n\nAs with all generative AI, content may include inaccurate or placeholder information. GroqNotes is in beta and all feedback is welcome!"
-        )
+        # st.markdown(
+        #     f"[Github Repository](https://github.com/bklieger/groqnotes)\n\nAs with all generative AI, content may include inaccurate or placeholder information. GroqNotes is in beta and all feedback is welcome!"
+        # )
 
         st.write(f"---")
 
@@ -126,6 +127,7 @@ try:
             "Important: Different models have different token and rate limits which may cause runtime errors."
         )
 
+    audio_file_title = None
     if st.button('End Generation and Download Notes'):
         if "notes" in st.session_state:
 
@@ -134,7 +136,7 @@ try:
                 st.session_state.notes.get_markdown_content())
             st.download_button(label='Download Text',
                                data=markdown_file,
-                               file_name='generated_notes.txt',
+                               file_name=f'{audio_file_title}_notes.txt',
                                mime='text/plain')
 
             # Create pdf file (styled)
@@ -142,7 +144,7 @@ try:
                 st.session_state.notes.get_markdown_content())
             st.download_button(label='Download PDF',
                                data=pdf_file,
-                               file_name='generated_notes.pdf',
+                               file_name=f'{audio_file_title}_notes.pdf',
                                mime='application/pdf')
             st.session_state.button_disabled = False
         else:
@@ -151,6 +153,7 @@ try:
 
     input_method = st.radio("Choose input method:",
                             ["Upload audio file", "YouTube link"])
+
     audio_file = None
     youtube_link = None
     groq_input_key = None
@@ -219,7 +222,7 @@ try:
 
             if input_method == "YouTube link":
                 display_status("Downloading audio from YouTube link ....")
-                audio_file_path = download_video_audio(
+                audio_file_path, audio_title = download_video_audio(
                     youtube_link, display_download_status)
                 if audio_file_path is None:
                     st.error(
@@ -238,8 +241,8 @@ try:
                     if os.path.getsize(audio_file_path) > MAX_FILE_SIZE:
                         raise ValueError(FILE_TOO_LARGE_MESSAGE)
 
-                    audio_file.name = os.path.basename(
-                        audio_file_path)  # Set the file name
+                    audio_file.name = audio_title  # Set the file name
+                    audio_file_title = audio_file.name
                     delete_download(audio_file_path)
                 clear_download_status()
 

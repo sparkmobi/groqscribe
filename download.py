@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 import yt_dlp as youtube_dl
 import os
 import time
-import os
+import re
 import shutil
 
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
@@ -12,6 +12,7 @@ delay = 2
 
 
 class MyLogger(object):
+
     def __init__(self, external_logger=lambda x: None):
         self.external_logger = external_logger
 
@@ -34,18 +35,19 @@ def my_hook(d):
 
 def get_ydl_opts(external_logger=lambda x: None):
     return {
-    "format": "bestaudio/best",
-    "postprocessors": [
-        {
+        "format":
+        "bestaudio/best",
+        "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
-                "preferredquality": "192",  # set the preferred bitrate to 192kbps
-            }
-        ],
-        "logger": MyLogger(external_logger),
-    "outtmpl": "./downloads/audio/%(title)s.%(ext)s",  # Set the output filename directly
-    "progress_hooks": [my_hook],
-}
+            "preferredquality": "192",  # set the preferred bitrate to 192kbps
+        }],
+        "logger":
+        MyLogger(external_logger),
+        "outtmpl":
+        "./downloads/audio/%(title)s.%(ext)s",  # Set the output filename directly
+        "progress_hooks": [my_hook],
+    }
 
 
 def download_video_audio(url, external_logger=lambda x: None):
@@ -62,9 +64,12 @@ def download_video_audio(url, external_logger=lambda x: None):
                 filename = ydl.prepare_filename(info)
                 res = ydl.download([url])
                 print("youtube-dl result :", res)
+                filetitle = info.get(
+                    'title', 'Video with ID: ' + info.get('id', 'unknown'))
                 mp3_filename = os.path.splitext(filename)[0] + '.mp3'
+                mp3_filetitle = re.sub(r'[\\/:*?"<>|]', '', filetitle)
                 print('mp3 file name - ', mp3_filename)
-                return mp3_filename
+                return mp3_filename, mp3_filetitle
         except Exception as e:
             retries += 1
             print(
@@ -74,7 +79,6 @@ def download_video_audio(url, external_logger=lambda x: None):
             if retries >= max_retries:
                 raise e
             time.sleep(delay)
-
 
 
 def delete_download(path):
@@ -93,4 +97,3 @@ def delete_download(path):
         print(f"File or directory not found: {path}")
     except Exception as e:
         print(f"An error occurred while trying to delete {path}: {str(e)}")
-        

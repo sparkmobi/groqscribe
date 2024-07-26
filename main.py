@@ -10,8 +10,7 @@ from notes import GenerationStatistics, NoteSection, generate_notes_structure, g
 
 load_dotenv()
 
-GROQ_API_KEY = os.environ.get(
-    "GROQ_API_KEY", "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")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
 FILE_TOO_LARGE_MESSAGE = "The audio file is too large for the current size and rate limits using Whisper. If you used a YouTube link, please try a shorter video clip. If you uploaded an audio file, try trimming or compressing the audio to under 25 MB."
@@ -39,6 +38,9 @@ if 'button_text' not in st.session_state:
 
 if 'statistics_text' not in st.session_state:
     st.session_state.statistics_text = ""
+
+if 'notes_title' not in st.session_state:
+    st.session_state.notes_title = "generate"
 
 st.write("""
 # GroqNotes: Create structured notes from audio 🗒️⚡
@@ -127,25 +129,26 @@ try:
             "Important: Different models have different token and rate limits which may cause runtime errors."
         )
 
-    audio_file_title = None
     if st.button('End Generation and Download Notes'):
         if "notes" in st.session_state:
 
             # Create markdown file
             markdown_file = create_markdown_file(
                 st.session_state.notes.get_markdown_content())
-            st.download_button(label='Download Text',
-                               data=markdown_file,
-                               file_name=f'{audio_file_title}_notes.txt',
-                               mime='text/plain')
+            st.download_button(
+                label='Download Text',
+                data=markdown_file,
+                file_name=f'{st.session_state.notes_title}_notes.txt',
+                mime='text/plain')
 
             # Create pdf file (styled)
             pdf_file = create_pdf_file(
                 st.session_state.notes.get_markdown_content())
-            st.download_button(label='Download PDF',
-                               data=pdf_file,
-                               file_name=f'{audio_file_title}_notes.pdf',
-                               mime='application/pdf')
+            st.download_button(
+                label='Download PDF',
+                data=pdf_file,
+                file_name=f'{st.session_state.notes_title}_notes.pdf',
+                mime='application/pdf')
             st.session_state.button_disabled = False
         else:
             raise ValueError(
@@ -241,8 +244,9 @@ try:
                     if os.path.getsize(audio_file_path) > MAX_FILE_SIZE:
                         raise ValueError(FILE_TOO_LARGE_MESSAGE)
 
-                    audio_file.name = audio_title  # Set the file name
-                    audio_file_title = audio_file.name
+                    audio_file.name = os.path.basename(
+                        audio_file_path)  # Set the file name
+                    st.session_state.notes_title = str(audio_title)
                     delete_download(audio_file_path)
                 clear_download_status()
 

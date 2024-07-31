@@ -9,6 +9,7 @@ from download import download_video_audio, delete_download
 
 
 class GenerationStatistics:
+
     def __init__(self,
                  input_time=0,
                  output_time=0,
@@ -78,9 +79,9 @@ class NoteSection:
             for title in self.flatten_structure(structure)
         }
 
-        st.markdown("## Raw transcript:")
-        st.markdown(transcript)
-        st.markdown("---")
+        # st.markdown("## Raw transcript:")
+        # st.markdown(transcript)
+        # st.markdown("---")
 
     def flatten_structure(self, structure):
         sections = []
@@ -214,7 +215,7 @@ def generate_notes_structure(transcript: str, model: str = "llama3-70b-8192"):
             "role":
             "user",
             "content":
-            f"### Transcript {transcript}\n\n### Example\n\n{shot_example}### Instructions\n\nCreate a structure for comprehensive notes on the above transcribed audio. Section titles and content descriptions must be comprehensive. Quality over quantity."
+            f"### Transcript {transcript}\n\n### Example\n\n{shot_example}\n\n### Instructions\n\nCreate a structure for comprehensive notes on the above transcribed audio. Section titles and content descriptions must be comprehensive. Quality over quantity. Don't include any additional information."
         }],
         temperature=0.3,
         max_tokens=8000,
@@ -246,12 +247,12 @@ def generate_section(transcript: str,
             "role":
             "system",
             "content":
-            "You are an expert writer. Generate a comprehensive note for the section provided based factually on the transcript provided. Do *not* repeat any content from previous sections."
+            "You are an expert writer. Generate a comprehensive note for the section provided based factually on the transcript provided. Do *not* repeat any content from previous sections. Avoid giving a premise before the section. Don't repeat section titles."
         }, {
             "role":
             "user",
             "content":
-            f"### Transcript\n\n{transcript}\n\n### Existing Notes\n\n{existing_notes}\n\n### Instructions\n\nGenerate comprehensive notes for this section only based on the transcript: \n\n{section}"
+            f"### Transcript\n\n{transcript}\n\n### Existing Notes\n\n{existing_notes}\n\n### Instructions\n\nGenerate comprehensive notes for this section only based on the transcript: \n\n{section}."
         }],
         temperature=0.3,
         max_tokens=8000,
@@ -276,3 +277,70 @@ def generate_section(transcript: str,
                 total_time=usage.total_time,
                 model_name=model)
             yield statistics_to_return
+
+def generate_section_2(transcript: str,
+     existing_notes: str,
+     section: str,
+     model: str = "llama3-8b-8192"):
+    
+    stream = st.session_state.groq.chat.completions.create(
+        model=model,
+        messages=[{
+            "role":
+            "system",
+            "content":
+            "You are an expert writer. Generate a comprehensive note for the section provided based factually on the transcript provided. Do *not* repeat any content from previous sections. Avoid giving a premise before the section. Don't repeat section titles."
+        }, {
+            "role":
+            "user",
+            "content":
+            f"### Transcript\n\n{transcript}\n\n### Existing Notes\n\n{existing_notes}\n\n### Instructions\n\nGenerate comprehensive notes for this section only based on the transcript: \n\n{section}."
+        }],
+        temperature=0.3,
+        max_tokens=8000,
+        top_p=1,
+        stream=True,
+        stop=None,
+    )
+    for chunk in stream:
+        tokens = chunk.choices[0].delta.content
+        if tokens:
+            yield tokens
+        if x_groq := chunk.x_groq:
+            if not x_groq.usage:
+                continue
+            usage = x_groq.usage
+            statistics_to_return = GenerationStatistics(
+                input_time=usage.prompt_time,
+                output_time=usage.completion_time,
+                input_tokens=usage.prompt_tokens,
+                output_tokens=usage.completion_tokens,
+                total_time=usage.total_time,
+                model_name=model)
+            yield statistics_to_return
+
+def generate_transcript_structure(
+    transcript: str,
+    sections: list,
+    model: str = "llama3-70b-8192",
+):
+    """
+    Returns transcript structure content segmented into sections
+    """
+    structured_transcript = {}
+    current_section = None
+    current_content = ""
+
+    for line in transcript.splitlines():
+        for section in sections:
+            if section in line:  # Section title found in the line
+                current_section = section
+                structured_transcript[current_section] = ""
+                current_content = ""  # Reset content for the new section
+                break
+
+        if current_section:  # If we're in a section
+            current_content += line + "\n"
+            structured_transcript[current_section] = current_content
+
+    return structured_transcript

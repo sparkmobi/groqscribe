@@ -85,6 +85,7 @@ class NoteSection:
 
     def flatten_structure(self, structure):
         sections = []
+        print(f'Structure is of {type(structure)} in flatten_structure')
         for title, content in structure.items():
             sections.append(title)
             if isinstance(content, dict):
@@ -151,6 +152,24 @@ class NoteSection:
             if isinstance(content, dict):
                 markdown_content += self.get_markdown_content(
                     content, level + 1)
+        return markdown_content
+
+    def get_transcript_markdown_content(self, structure=None, level=1):
+        """
+        Returns the markdown styled pure string with the contents.
+        """
+        if structure is None:
+            structure = self.structure
+
+        # print(f'These are the contents of structure: {structure}')
+
+        markdown_content = ""
+        for title, content in structure.items(
+        ):  # Iterate directly over the list of titles
+            markdown_content += f"{'#' * level} {title}\n{content}.\n\n"
+
+        # print(
+        #     f'These are the contents of markdown_content: {markdown_content}')
         return markdown_content
 
 
@@ -278,11 +297,12 @@ def generate_section(transcript: str,
                 model_name=model)
             yield statistics_to_return
 
+
 def generate_section_2(transcript: str,
-     existing_notes: str,
-     section: str,
-     model: str = "llama3-8b-8192"):
-    
+                       existing_notes: str,
+                       section: str,
+                       model: str = "llama3-8b-8192"):
+
     stream = st.session_state.groq.chat.completions.create(
         model=model,
         messages=[{
@@ -319,28 +339,101 @@ def generate_section_2(transcript: str,
                 model_name=model)
             yield statistics_to_return
 
+
 def generate_transcript_structure(
     transcript: str,
     sections: list,
     model: str = "llama3-70b-8192",
 ):
     """
-    Returns transcript structure content segmented into sections
+    Returns transcript structure content segmented into sections using a model to identify section boundaries.
     """
     structured_transcript = {}
     current_section = None
     current_content = ""
 
-    for line in transcript.splitlines():
-        for section in sections:
-            if section in line:  # Section title found in the line
-                current_section = section
-                structured_transcript[current_section] = ""
-                current_content = ""  # Reset content for the new section
-                break
+    # Use the model to identify section boundaries in the transcript.
+    completion = st.session_state.groq.chat.completions.create(
+        model=model,
+        messages=[{
+            "role":
+            "system",
+            "content":
+            "You are a transcript editor. Identify the sections in the following transcript, preserving the original text.  Output a JSON object where each key is a section title from the provided list, and the value is the content of that section."
+        }, {
+            "role":
+            "user",
+            "content":
+            f"### Transcript\n\n{transcript}\n\n### Sections\n\n{sections}\n\n### Instructions\n\nIdentify the sections in the transcript and insert a separator (---) between them. Preserve the original text and do not add any additional information.  Output the structured transcript as a JSON object with the format:\n\n```json\n{{\n  \"{sections[0]}\": \"Content of section 1\",\n  \"{sections[1]}\": \"Content of section 2\",\n  ...\n}}\n```"
+        }],
+        temperature=0.3,
+        max_tokens=8000,
+        top_p=1,
+        stream=False,
+        response_format={"type": "json_object"},
+        stop=None,
+    )
 
-        if current_section:  # If we're in a section
-            current_content += line + "\n"
-            structured_transcript[current_section] = current_content
+    # Extract the structured transcript from the model's response.
+    structured_transcript = completion.choices[0].message.content
 
     return structured_transcript
+
+
+# def generate_transcript_structure(
+#     transcript: str,
+#     sections: list,
+#     model: str = "llama3-70b-8192",
+# ):
+#     """
+#     Returns transcript structure content segmented into sections using a model to identify section boundaries.
+#     """
+#     structured_transcript = {}
+#     current_section = None
+#     current_content = ""
+
+#     shot_example = """
+# "Introduction": "Introduction to the AMA session, including the topic of Groq scaling architecture and the panelists",
+# "Panelist Introductions": "Brief introductions from Igor, Andrew, and Omar, covering their backgrounds and roles at Groq",
+# "Groq Scaling Architecture Overview": "High-level overview of Groq's scaling architecture, covering hardware, software, and cloud components",
+# "Hardware Perspective": "Igor's overview of Groq's hardware approach, using an analogy of city traffic management to explain the traditional compute approach and Groq's innovative approach",
+# "Traditional Compute": "Description of traditional compute approach, including asynchronous nature, queues, and poor utilization of infrastructure",
+# "Groq's Approach": "Description of Groq's approach, including pre-orchestrated movement of data, low latency, high energy efficiency, and high utilization of resources",
+# "Hardware Implementation": "Igor's explanation of the hardware implementation, including a comparison of GPU and LPU architectures"
+# }"""
+
+#     # Use the model to identify section boundaries in the transcript.
+#     completion = st.session_state.groq.chat.completions.create(
+#         model=model,
+#         messages=[{
+#             "role":
+#             "system",
+#             "content":
+#             "You are a transcript editor. Identify the sections in the following transcript, preserving the original text. Write in JSON format:\n\n{\"Section 1\":\"Section 1 content\",\"Section 2\":\"Section 2 content\""
+#         }, {
+#             "role":
+#             "user",
+#             "content":
+#             f"### Transcript\n\n{transcript}\n\n### Sections\n\n{sections}\n\n### Example\n\n{shot_example}\n\n### Instructions\n\nIdentify the sections in the transcript and insert a separator (---) between them. Preserve the original text and do not add any additional information."
+#         }],
+#         temperature=0.3,
+#         max_tokens=8000,
+#         top_p=1,
+#         stream=False,
+#         response_format={"type": "json_object"},
+#         stop=None,
+#     )
+
+#     # Extract the structured transcript from the model's response.
+#     structured_transcript_text = completion.choices[0].message.content
+#     structured_transcript_lines = structured_transcript_text.splitlines()
+#     for line in structured_transcript_lines:
+#         if "---" in line:  # Section boundary found
+#             current_section = sections.pop(0)
+#             structured_transcript[current_section] = ""
+#             current_content = ""  # Reset content for the new section
+#         else:
+#             current_content += line + "\n"
+#             structured_transcript[current_section] = current_content
+
+#     return structured_transcript_text

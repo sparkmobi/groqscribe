@@ -63,6 +63,10 @@ if 'statistics_text' not in st.session_state:
     st.session_state.statistics_text = ""
 if 'notes_title' not in st.session_state:
     st.session_state.notes_title = "generate"
+if 'notes' not in st.session_state:
+    st.session_state.notes = None
+if 'transcript_notes' not in st.session_state:
+    st.session_state.transcript_notes = None
 
 # Main Page Content
 st.write("""
@@ -181,7 +185,7 @@ try:
 
     # Main Content
     if st.button('End Generation and Download Notes'):
-        if "notes" in st.session_state:
+        if st.session_state.notes is not None:
             markdown_file = create_markdown_file(
                 st.session_state.notes.get_markdown_content())
             st.download_button(
@@ -191,6 +195,23 @@ try:
                 mime='text/plain')
             pdf_file = create_pdf_file(
                 st.session_state.notes.get_markdown_content())
+            st.download_button(
+                label='Download PDF',
+                data=pdf_file,
+                file_name=f'{st.session_state.notes_title}_notes.pdf',
+                mime='application/pdf')
+            st.session_state.button_disabled = False
+        elif st.session_state.transcript_notes is not None:
+            markdown_file = create_markdown_file(
+                st.session_state.transcript_notes.
+                get_transcript_markdown_content())
+            st.download_button(
+                label='Download Text',
+                data=markdown_file,
+                file_name=f'{st.session_state.notes_title}_notes.txt',
+                mime='text/plain')
+            pdf_file = create_pdf_file(st.session_state.transcript_notes.
+                                       get_transcript_markdown_content())
             st.download_button(
                 label='Download PDF',
                 data=pdf_file,
@@ -207,6 +228,10 @@ try:
     audio_file = None
     youtube_link = None
     groq_input_key = None
+    audio_file_path = None
+    notes = None
+    transcript_notes = None
+
     with st.form("groqform"):
         if not GROQ_API_KEY:
             groq_input_key = st.text_input(
@@ -238,7 +263,6 @@ try:
 
         if submitted or submitted_2:
             st.session_state.button_disabled = True
-            audio_file_path = None
 
             if input_method == "YouTube link":
                 display_status("Downloading audio from YouTube link ....")
@@ -283,8 +307,7 @@ try:
                     notes_structure_json = json.loads(notes_structure)
                     notes = NoteSection(structure=notes_structure_json,
                                         transcript=transcription_text)
-                    if 'notes' not in st.session_state:
-                        st.session_state.notes = notes
+                    st.session_state.notes = notes
                     st.session_state.notes.display_structure()
 
                     stream_section_content(notes_structure_json,
@@ -303,20 +326,25 @@ try:
                 display_statistics()
                 # st.markdown(f"## Transcript:\n{transcription_text}")
                 display_status("Generating transcript structure....")
-                _, notes_structure = generate_notes_structure(
+                _, notes_structure_1 = generate_notes_structure(
                     transcription_text, model=str(outline_selected_model))
-                notes_structure_json = json.loads(notes_structure)
-                notes_sections = [
-                    title for title in notes_structure_json.keys()
-                ]
-                notes_structure = generate_transcript_structure(
+                notes_structure_json = json.loads(notes_structure_1)
+                notes_sections = [title for title in notes_structure_json]
+                notes_structure_2 = generate_transcript_structure(
                     transcription_text, notes_sections)
-                notes = NoteSection(structure=notes_structure,
-                                    transcript=transcription_text)
-
-                if 'notes' not in st.session_state:
-                    st.session_state.notes = notes
-                st.session_state.notes.display_structure()
+                notes_structure_json_2 = json.loads(notes_structure_2)
+                print(
+                    f'Structure is of {type(notes_structure_json_2)} in main.py'
+                )
+                # print("Structure: ", notes_structure_2)
+                transcript_notes = NoteSection(
+                    structure=notes_structure_json_2,
+                    transcript=transcription_text)
+                st.markdown(
+                    f"## Transcript:\n{transcript_notes.get_transcript_markdown_content()}"
+                )
+                st.session_state.transcript_notes = transcript_notes
+                # st.session_state.transcript_notes.display_structure()
 
                 st.session_state.button_disabled = False
                 enable()

@@ -3,7 +3,7 @@ from groq import Groq
 import json
 import os
 from io import BytesIO
-from md2pdf.core import md2pdf
+# from md2pdf.core import md2pdf
 from dotenv import load_dotenv
 from download import download_video_audio, delete_download
 from notes import GenerationStatistics, NoteSection, generate_notes_structure, generate_section, create_markdown_file, create_pdf_file, transcribe_audio, generate_transcript_structure
@@ -114,7 +114,6 @@ def display_statistics():
                 st.markdown(st.session_state.statistics_text)
         else:
             placeholder.empty()
-
 
 def stream_section_content(sections, transcription_text, notes,
                            content_selected_model,
@@ -240,7 +239,7 @@ try:
         if input_method == "Upload audio file":
             audio_file = st.file_uploader("Upload an audio file",
                                           type=["mp3", "wav",
-                                                "m4a"])  # TODO: Add a max size
+                                                "m4a"])
         else:
             youtube_link = st.text_input("Enter YouTube link:", "")
 

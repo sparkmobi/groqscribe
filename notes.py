@@ -1,11 +1,7 @@
 import streamlit as st
-from groq import Groq
-import json
-import os
 from io import BytesIO
 from md2pdf.core import md2pdf
-from dotenv import load_dotenv
-from download import download_video_audio, delete_download
+
 
 
 class GenerationStatistics:
@@ -298,48 +294,6 @@ def generate_section(transcript: str,
             yield statistics_to_return
 
 
-def generate_section_2(transcript: str,
-                       existing_notes: str,
-                       section: str,
-                       model: str = "llama3-8b-8192"):
-
-    stream = st.session_state.groq.chat.completions.create(
-        model=model,
-        messages=[{
-            "role":
-            "system",
-            "content":
-            "You are an expert writer. Generate a comprehensive note for the section provided based factually on the transcript provided. Do *not* repeat any content from previous sections. Avoid giving a premise before the section. Don't repeat section titles."
-        }, {
-            "role":
-            "user",
-            "content":
-            f"### Transcript\n\n{transcript}\n\n### Existing Notes\n\n{existing_notes}\n\n### Instructions\n\nGenerate comprehensive notes for this section only based on the transcript: \n\n{section}."
-        }],
-        temperature=0.3,
-        max_tokens=8000,
-        top_p=1,
-        stream=True,
-        stop=None,
-    )
-    for chunk in stream:
-        tokens = chunk.choices[0].delta.content
-        if tokens:
-            yield tokens
-        if x_groq := chunk.x_groq:
-            if not x_groq.usage:
-                continue
-            usage = x_groq.usage
-            statistics_to_return = GenerationStatistics(
-                input_time=usage.prompt_time,
-                output_time=usage.completion_time,
-                input_tokens=usage.prompt_tokens,
-                output_tokens=usage.completion_tokens,
-                total_time=usage.total_time,
-                model_name=model)
-            yield statistics_to_return
-
-
 def generate_transcript_structure(
     transcript: str,
     sections: list,
@@ -378,62 +332,3 @@ def generate_transcript_structure(
     structured_transcript = completion.choices[0].message.content
 
     return structured_transcript
-
-
-# def generate_transcript_structure(
-#     transcript: str,
-#     sections: list,
-#     model: str = "llama3-70b-8192",
-# ):
-#     """
-#     Returns transcript structure content segmented into sections using a model to identify section boundaries.
-#     """
-#     structured_transcript = {}
-#     current_section = None
-#     current_content = ""
-
-#     shot_example = """
-# "Introduction": "Introduction to the AMA session, including the topic of Groq scaling architecture and the panelists",
-# "Panelist Introductions": "Brief introductions from Igor, Andrew, and Omar, covering their backgrounds and roles at Groq",
-# "Groq Scaling Architecture Overview": "High-level overview of Groq's scaling architecture, covering hardware, software, and cloud components",
-# "Hardware Perspective": "Igor's overview of Groq's hardware approach, using an analogy of city traffic management to explain the traditional compute approach and Groq's innovative approach",
-# "Traditional Compute": "Description of traditional compute approach, including asynchronous nature, queues, and poor utilization of infrastructure",
-# "Groq's Approach": "Description of Groq's approach, including pre-orchestrated movement of data, low latency, high energy efficiency, and high utilization of resources",
-# "Hardware Implementation": "Igor's explanation of the hardware implementation, including a comparison of GPU and LPU architectures"
-# }"""
-
-#     # Use the model to identify section boundaries in the transcript.
-#     completion = st.session_state.groq.chat.completions.create(
-#         model=model,
-#         messages=[{
-#             "role":
-#             "system",
-#             "content":
-#             "You are a transcript editor. Identify the sections in the following transcript, preserving the original text. Write in JSON format:\n\n{\"Section 1\":\"Section 1 content\",\"Section 2\":\"Section 2 content\""
-#         }, {
-#             "role":
-#             "user",
-#             "content":
-#             f"### Transcript\n\n{transcript}\n\n### Sections\n\n{sections}\n\n### Example\n\n{shot_example}\n\n### Instructions\n\nIdentify the sections in the transcript and insert a separator (---) between them. Preserve the original text and do not add any additional information."
-#         }],
-#         temperature=0.3,
-#         max_tokens=8000,
-#         top_p=1,
-#         stream=False,
-#         response_format={"type": "json_object"},
-#         stop=None,
-#     )
-
-#     # Extract the structured transcript from the model's response.
-#     structured_transcript_text = completion.choices[0].message.content
-#     structured_transcript_lines = structured_transcript_text.splitlines()
-#     for line in structured_transcript_lines:
-#         if "---" in line:  # Section boundary found
-#             current_section = sections.pop(0)
-#             structured_transcript[current_section] = ""
-#             current_content = ""  # Reset content for the new section
-#         else:
-#             current_content += line + "\n"
-#             structured_transcript[current_section] = current_content
-
-#     return structured_transcript_text

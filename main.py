@@ -115,6 +115,7 @@ def display_statistics():
         else:
             placeholder.empty()
 
+
 def stream_section_content(sections, transcription_text, notes,
                            content_selected_model,
                            total_generation_statistics):
@@ -238,8 +239,7 @@ try:
 
         if input_method == "Upload audio file":
             audio_file = st.file_uploader("Upload an audio file",
-                                          type=["mp3", "wav",
-                                                "m4a"])
+                                          type=["mp3", "wav", "m4a"])
         else:
             youtube_link = st.text_input("Enter YouTube link:", "")
 
@@ -275,6 +275,7 @@ try:
                     clear_status()
                 else:
                     display_status("Processing Youtube audio ....")
+                    print(f'Audio file path is: {audio_file_path}')
                     with open(audio_file_path, 'rb') as f:
                         file_contents = f.read()
                     audio_file = BytesIO(file_contents)

@@ -74,7 +74,7 @@ def preprocess_audio(input_file):
 
     ffmpeg_command = [
         'ffmpeg', '-i', input_file, '-vn', '-map_metadata', '-1', '-ac', '1',
-        '-c:a', 'libopus', '-b:a', '128k', '-application', 'voip', '-y',
+        '-c:a', 'libopus', '-b:a', '12k', '-application', 'voip', '-y',
         output_file
     ]
 
@@ -83,8 +83,8 @@ def preprocess_audio(input_file):
                                    stderr=subprocess.PIPE,
                                    universal_newlines=True)
 
-        # for output in process.stderr:
-        #     print(output.strip())
+        for output in process.stderr:
+            print(output.strip())
 
         process.wait()
 
@@ -92,11 +92,11 @@ def preprocess_audio(input_file):
             raise subprocess.CalledProcessError(process.returncode,
                                                 ffmpeg_command)
 
-        stderr_output = process.stderr.read()
-        lines = stderr_output.splitlines()
+        # stderr_output = process.stderr.read()
+        # lines = stderr_output.splitlines()
 
-        for line in lines:
-            print(line)
+        # for line in lines:
+        #     print(line)
 
         print("Preprocessing complete!")
         time.sleep(0.5)  # Give user a moment to see 100%

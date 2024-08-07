@@ -1,6 +1,40 @@
+"""
+download.py
+
+This module provides functionality for downloading and preprocessing audio files.
+
+Modules:
+- yt_dlp: A Python library for downloading YouTube videos.
+- os: For handling OS functionality like handling file paths.
+- time: For working with time intervals and other time-related functions.
+- re: For regular expression operations such as string searching and manipulation.
+- shutil: For handling file operations like copying, moving, and deleting files.
+- subprocess: For executing external commands and capturing their output.
+- tempfile: For creating temporary files and directories.
+- logging: Generic logger to handle logging messages.
+
+Classes:
+- MyLogger: Custom logger class to handle logging messages.
+
+Functions:
+- move_to_new_path(): Moves the input file to a new directory and returns the new file path.
+- preprocess_audio(): Preprocesses the input audio file using 'ffmpeg' and saves it in ogg format.
+- my_hook():  A custom hook function for youtube_dl to handle download progress.
+- get_ydl_opts(): Generates and returns a dictionary of options for youtube_dl.
+- handle_large_file(): Handles the processing of large audio files by preparing and preprocessing them.
+- download_video_audio(): Downloads and preprocesses the audio from a YouTube video into an MP3 file.
+- delete_download(): Deletes the specified file or directory.
+
+Constants:
+- logger: Instance of logging to log messages.
+- MAX_FILE_SIZE: Maximum allowed file size for audio files (25 MB).
+- FILE_TOO_LARGE_MESSAGE: Message displayed when the file size exceeds the maximum allowed size.
+- max_retries: Maximum number of tries to retrieve content from YouTube.
+- delay: Time delay between retries in seconds.
+"""
+
 from __future__ import unicode_literals
 import yt_dlp as youtube_dl
-import streamlit as st
 import os
 import time
 import re
@@ -19,6 +53,17 @@ delay = 2
 
 
 class MyLogger(object):
+    """
+    A custom logger to handle logging messages with different severities.
+    
+    Attributes:
+        external_logger (function): A function to handle logging messages. Defaults to a no-op lambda function.
+
+    Methods:
+        debug(msg): Logs a debug message.
+        warning(msg): Logs a warning message.
+        error(msg): Logs an error message.
+    """
 
     def __init__(self, external_logger=lambda x: None):
         self.external_logger = external_logger
@@ -34,26 +79,19 @@ class MyLogger(object):
         print("[error]: ", msg)
 
 
-# def preprocess_audio(input_file):
-#     """
-#     """
-#     with tempfile.NamedTemporaryFile(suffix='.ogg', delete=False) as temp_file:
-#         output_file = temp_file.name
-
-#     ffmpeg_cmd = [
-#         'ffmpeg', '-i', input_file, '-vn', '-map_metadata', '-1', '-ac', '1',
-#         '-c:a', 'libopus', '-b:a', '12k', '-application', 'voip', output_file
-#     ]
-
-#     try:
-#         subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
-#         return output_file
-#     except subprocess.CalledProcessError as e:
-#         st.error(f"Error preprocessing audo: {e.stderr.decode('utf-8')}")
-#         return None
-
-
 def move_to_new_path(input_file):
+    """
+    Moves the input file to a new directory and returns the new file path.
+
+    This function moves the specified input file to the './downloads/audio' directory.
+    It ensures that the new directory exists before moving the file. The new file path is returned.
+
+    Args:
+        input_file (str): The path to the input file that needs to be moved.
+
+    Returns:
+        str: The new file path after moving the file.
+    """
     # Define the new directory and file name
     new_directory = "./downloads/audio/"
     print(f"This is the basename: {os.path.basename(input_file)}")
@@ -68,6 +106,18 @@ def move_to_new_path(input_file):
 
 
 def preprocess_audio(input_file):
+    """
+    Preprocesses the input audio file using 'ffmpeg' and saves it in ogg format.
+
+    This function converts the input audio file to a mono-channel Opus file with specific encoding settings suitable for voice applications.
+    It uses a temporary file to store the output and moves it to a new directory. If the 'ffmpeg' process encounters an error, it logs the error message and returns None.
+
+    Args:
+        input_file (str): The path to the input audio file that needs to be preprocessed.
+
+    Returns:
+        str: The path to the preprocessed audio file in ogg format.
+    """
 
     with tempfile.NamedTemporaryFile(suffix='.ogg', delete=False) as temp_file:
         output_file = move_to_new_path(temp_file.name)
@@ -92,16 +142,8 @@ def preprocess_audio(input_file):
             raise subprocess.CalledProcessError(process.returncode,
                                                 ffmpeg_command)
 
-        # stderr_output = process.stderr.read()
-        # lines = stderr_output.splitlines()
-
-        # for line in lines:
-        #     print(line)
-
         print("Preprocessing complete!")
         time.sleep(0.5)  # Give user a moment to see 100%
-        # os.remove(input_file)
-        # output_file = "./downloads/audio/" + output_file
         return output_file
     except subprocess.CalledProcessError as e:
         print(f"Error preprocessing audio: {e}")
@@ -109,12 +151,30 @@ def preprocess_audio(input_file):
 
 
 def my_hook(d):
+    """
+    A custom hook function for youtube_dl to handle download progress.
+
+    This function prints the download progress and logs the progress to the console.
+    When the status is 'finished', it indicates that the download is complete and the conversion process will begin.
+    """
     print("hook", d["status"])
     if d["status"] == "finished":
         print("Done downloading, now converting ...")
 
 
 def get_ydl_opts(external_logger=lambda x: None):
+    """
+    Generates and returns a dictionary of options for youtube_dl.
+
+    This function creates a set of options for downloading audio using 'youtube_dl'. It specifies the format,
+    post-processing steps, logging, output template, and progress hooks.
+
+    Args:
+        external_logger (function): A function to handle logging messages. Defaults to a no-op lambda function.
+
+    Returns:
+        dict: A dictionary of options for youtube_dl.
+    """
     return {
         "format":
         "bestaudio/best",
@@ -132,44 +192,42 @@ def get_ydl_opts(external_logger=lambda x: None):
 
 
 def handle_large_file(filesize, MAX_FILE_SIZE, ydl, info):
+    """
+    Handles the processing of large audio files by preparing and preprocessing them.
+
+    This function uses 'yt_dlp' to download the audio file, converts it to an MP3 format, preprocesses it, and returns the preprocessed file path.
+
+    Args:
+        filesize (int): The size of the audio file in bytes.
+        MAX_FILE_SIZE (int): The maximum allowed file size for audio files (25 MB).
+        ydl (yt_dlp.YoutubeDL): An instance of 'yt_dlp.YoutubeDL' class used to prepare the filename.
+        info (dict): The metadata of the downloaded audio file.
+
+    Returns:
+        str: The path to the preprocessed audio file in ogg format.    
+    """
     input_file = ydl.prepare_filename(info)
     input_file_name = os.path.splitext(input_file)[0] + '.mp3'
     filename = preprocess_audio(input_file_name)
     return filename
-    # if 'large_file_handled' not in st.session_state:
-    #     st.session_state.large_file_handled = False
-
-    # if 'proceed' not in st.session_state:
-    #     st.session_state.proceed = False
-
-    # if not st.session_state.large_file_handled:
-    #     st.warning(
-    #         "File size is {:.2f} MB which exceeds the maximum allowed size of {:.2f} MB. Processing will take longer. Proceed?"
-    #         .format(filesize / (1024 * 1024), MAX_FILE_SIZE / (1024 * 1024)))
-    #     proceed = st.radio("Do you want to proceed?", ('Yes', 'No'))
-    #     if proceed == 'Yes':
-    #         # if st.button("Proceed", key="proceed_button"):
-    #         st.session_state.large_file_handled = True
-    #         st.session_state.proceed = True
-    #     elif proceed == 'No':
-    #         # if st.button("Cancel", key="cancel_button"):
-    #         st.session_state.large_file_handled = True
-    #         st.session_state.proceed = False
-    #     else:
-    #         st.stop()
-
-    # if st.session_state.large_file_handled:
-    #     if st.session_state.proceed:
-    #         input_file = ydl.prepare_filename(info)
-    #         input_file_name = os.path.splitext(input_file)[0] + '.mp3'
-    #         filename = preprocess_audio(input_file_name)
-    #         return filename
-    #     else:
-    #         st.info("Operation cancelled by user.")
-    #         st.stop()
 
 
 def download_video_audio(url, external_logger=lambda x: None):
+    """
+    Downloads and preprocesses the audio from a YouTube video into an MP3 file.
+
+    This function uses 'yt_dlp' to download the audio from a YouTube video URL. It handles large audio files by preparing and preprocessing them. The function also retries the download in case of errors, up to a specifed number of times.
+
+    Args:
+        url (str): The URL of the YouTube video.
+        external_logger (function): A function to handle logging messages. Defaults to a no-op lambda function.
+
+    Returns:
+        tuple: A tuple containing the path to the audio file and the sanitized title of the video.
+
+    Raises:
+        Exception: If the download fails after multiple retries.
+    """
     retries = 0
     # while retries < max_retries:
     try:
@@ -202,6 +260,14 @@ def download_video_audio(url, external_logger=lambda x: None):
 
 
 def delete_download(path):
+    """
+    Deletes the specified file or directory.
+
+    This function attempts to delete the file or directory at the given path. It handles various exceptions such as permission errors, file not found errors, and other general exceptions, providing appropriate messages for each case.
+
+    Args:
+        path (str): The path to the file or directory to be deleted.
+    """
     try:
         if os.path.isfile(path):
             os.remove(path)

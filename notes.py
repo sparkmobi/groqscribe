@@ -1,10 +1,49 @@
+"""
+notes.py
+
+This file contains the functions for the notes section of the app.
+
+Modules:
+- streamlit: A Python library for building interactive apps.
+- io: A built-in module for working with input/output operations.
+- md2pdf: A Python library for converting Markdown to PDF.
+
+Classes:
+- GenerationStatistics: A class to represent and calculate statistics for generation tasks.
+- NoteSection: A class to represent and manage the notes section of the app.
+
+Functions:
+- create_markdown_file():
+- create_pdf_file():
+- transcribe_audio():
+- generate_notes_structure():
+- generate_section():
+- generate_transcript_structure():
+"""
+
 import streamlit as st
 from io import BytesIO
 from md2pdf.core import md2pdf
 
 
-
 class GenerationStatistics:
+    """
+    A class to represent and calculate statistics for generation tasks.
+
+    Attributes:
+        input_time (float): The time taken to process the input text.
+        output_time (float): The time taken to process the output text.
+        input_tokens (int): The number of input tokens.
+        output_tokens (int): The number of output tokens.
+        total_time (float): The total time taken to process the task.
+        model_name (str): The name of the model used for generation.
+
+    Methods:
+        get_input_speed(): Calculates and returns the input speed in tokens per second.
+        get_output_speed(): Calculates and returns the output speed in tokens per second.
+        add(other): Adds the statistics of another instance to this instance.
+        __str__(): Returns a string representation of the statistics.
+    """
 
     def __init__(self,
                  input_time=0,
@@ -63,6 +102,24 @@ class GenerationStatistics:
 
 
 class NoteSection:
+    """
+    A class to manage and display structured notes with markdown formatting.
+
+    Attributes:
+        structure (dict): A nested dictionary representing the notes structure.
+        contents (dict): A dictionary to store the contents of each note.
+        placeholders (dict): A dictionary to store placeholders for each note.
+
+    Methods:
+        flatten_structure(): Flattens the notes structure into a list of section titles.
+        update_content(): Updates the content of a given section.
+        display_content(): Displays the content of a given section if it is not empty.
+        return_existing_contents(): Returns the existing contents as a markdown string.
+        display_structure(): Displays the structure and content of the notes.
+        display_toc(): Displays the table of contents for the notes.
+        get_markdown_content(): Returns the markdown formatted content of the notes.
+        get_transcript_markdown_content(): Returns the markdown formatted content of the transcript.
+    """
 
     def __init__(self, structure, transcript):
         self.structure = structure
@@ -74,10 +131,6 @@ class NoteSection:
             title: st.empty()
             for title in self.flatten_structure(structure)
         }
-
-        # st.markdown("## Raw transcript:")
-        # st.markdown(transcript)
-        # st.markdown("---")
 
     def flatten_structure(self, structure):
         sections = []
@@ -256,6 +309,9 @@ def generate_section(transcript: str,
                      existing_notes: str,
                      section: str,
                      model: str = "llama3-8b-8192"):
+    """
+    Returns notes structure content as well as total tokens and total time for generation.
+    """
     stream = st.session_state.groq.chat.completions.create(
         model=model,
         messages=[{
@@ -303,8 +359,6 @@ def generate_transcript_structure(
     Returns transcript structure content segmented into sections using a model to identify section boundaries.
     """
     structured_transcript = {}
-    current_section = None
-    current_content = ""
 
     # Use the model to identify section boundaries in the transcript.
     completion = st.session_state.groq.chat.completions.create(

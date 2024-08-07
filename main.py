@@ -1,3 +1,40 @@
+"""
+main.py
+
+This is the main file of ScribePlus.
+
+Modules:
+- streamlit: For creating the web interface.
+- groq: For interacting with the Groq API.
+- json: For handling JSON data.
+- os: For working with operating system commands.
+- io: For working with input/output operations.
+- dotenv: For loading environment variables from a .env file.
+- download: For downloading and deleting audio files.
+- notes: For generating notes and transcript structure.
+
+Functions:
+- disable(): Disables certain features in the web interface.
+- enable(): Enables certain features in the web interface.
+- empty_st(): Empties the Streamlit session state.
+- display_status(): Displays the status of the audio process.
+- clear_status(): Clears the status of the audio process.
+- display_download_status(): Display the audio download progress.
+- clear_download_status(): Clears the audio download progress from screen.
+- display_statistics(): Handles the model stastistics and the transcription text as per progress.
+- stream_section_content(): Streams the section content and updates existing file. 
+
+Constants:
+- MAX_FILE_SIZE: The maximum file size for audio files (25 MB).
+- FILE_TOO_LARGE_MESSAGE: The message to display when the file is too large.
+- AUDIO_FILES: Dictionary of sample audio files with their paths and Youtube links.
+- OUTLINE_MODEL_OPTIONS: List of model options for generating outlines.
+- CONTENT_MODEL_OPTIONS: List of model options for generating content.
+
+Usage: 
+    Run this script using Streamlit to start the web application.
+"""
+
 import streamlit as st
 from groq import Groq
 import json
@@ -43,7 +80,7 @@ CONTENT_MODEL_OPTIONS = [
 
 # Streamlit Setup
 st.set_page_config(
-    page_title="GroqNotes",
+    page_title="ScribePlus",
     page_icon="🗒️",
 )
 
@@ -70,7 +107,7 @@ if 'transcript_notes' not in st.session_state:
 
 # Main Page Content
 st.write("""
-# GroqNotes: Create structured notes from audio 🗒️⚡
+# ScribePlus: Create structured notes from audio 🗒️⚡
 """)
 
 
@@ -104,6 +141,9 @@ def clear_download_status():
 
 
 def display_statistics():
+    """
+    Displays the model statistics and the transcription text as per progress.
+    """
     with placeholder.container():
         if st.session_state.statistics_text:
             if "Transcribing audio in background" not in st.session_state.statistics_text:
@@ -121,6 +161,13 @@ def stream_section_content(sections, transcription_text, notes,
                            total_generation_statistics):
     """
     Recursively streams the content of each section in the notes structure.
+
+    Args:
+        sections (dict): A dictionary where keys are section titles and values are strings (content) or nested dictionaries (subsections).
+        transcription_text (str): Transcription text.
+        notes (Notes): An instance of the Notes class, used to manage and update note contents.
+        content_selected_model (str): The selected model for generating content.
+        total_generation_statistics (GenerationStatistics): An instance of GenerationStatistics to accumulate statistics from the content generation process.
     """
     for title, content in sections.items():
         if isinstance(content, str):
@@ -149,7 +196,7 @@ def stream_section_content(sections, transcription_text, notes,
 try:
     with st.sidebar:
         st.write(
-            f"# 🗒️ GroqTranscribe \n## Generate notes from audio in seconds using Groq"
+            f"# 🗒️ ScribePlus \n## Generate notes from audio in seconds using Groq"
         )
         st.write(f"---")
 
@@ -171,7 +218,7 @@ try:
         st.write(
             "# Customization Settings\n🧪 These settings are experimental.\n")
         st.write(
-            f"By default, GroqNotes uses Llama3-70b for generating the notes outline and Llama3-8b for the content. This balances quality with speed and rate limit usage. You can customize these selections below."
+            f"By default, ScribePlus uses Llama3-70b for generating the notes outline and Llama3-8b for the content. This balances quality with speed and rate limit usage. You can customize these selections below."
         )
         outline_selected_model = st.selectbox("Outline generation:",
                                               OUTLINE_MODEL_OPTIONS)

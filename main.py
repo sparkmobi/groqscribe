@@ -331,28 +331,31 @@ try:
             st.session_state.button_disabled = True
 
             if input_method == "YouTube link":
-                display_status("Downloading audio from YouTube link ....")
-                audio_file_path, audio_title = download_video_audio(
-                    youtube_link, display_download_status)
-                if audio_file_path is None:
-                    st.error(
-                        "Failed to download audio from YouTube link. Please try again."
-                    )
-                    enable()
-                    clear_status()
+                if st.session_state.valid_youtube_link:
+                    display_status("Downloading audio from YouTube link ....")
+                    audio_file_path, audio_title = download_video_audio(
+                        youtube_link, display_download_status)
+                    if audio_file_path is None:
+                        st.error(
+                            "Failed to download audio from YouTube link. Please try again."
+                        )
+                        enable()
+                        clear_status()
+                    else:
+                        display_status("Processing Youtube audio ....")
+                        print(f'Audio file path is: {audio_file_path}')
+                        with open(audio_file_path, 'rb') as f:
+                            file_contents = f.read()
+                        audio_file = BytesIO(file_contents)
+                        if os.path.getsize(audio_file_path) > MAX_FILE_SIZE:
+                            raise ValueError(FILE_TOO_LARGE_MESSAGE)
+                        audio_file.name = os.path.basename(
+                            audio_file_path)  # Set the file name
+                        st.session_state.notes_title = str(audio_title)
+                        delete_download(audio_file_path)
+                    clear_download_status()
                 else:
-                    display_status("Processing Youtube audio ....")
-                    print(f'Audio file path is: {audio_file_path}')
-                    with open(audio_file_path, 'rb') as f:
-                        file_contents = f.read()
-                    audio_file = BytesIO(file_contents)
-                    if os.path.getsize(audio_file_path) > MAX_FILE_SIZE:
-                        raise ValueError(FILE_TOO_LARGE_MESSAGE)
-                    audio_file.name = os.path.basename(
-                        audio_file_path)  # Set the file name
-                    st.session_state.notes_title = str(audio_title)
-                    delete_download(audio_file_path)
-                clear_download_status()
+                    raise ValueError("Invalid YouTube link. Please try again.")
 
             if not GROQ_API_KEY:
                 st.session_state.groq = Groq(api_key=groq_input_key)

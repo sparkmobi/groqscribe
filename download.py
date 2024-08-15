@@ -24,6 +24,7 @@ Functions:
 - handle_large_file(): Handles the processing of large audio files by preparing and preprocessing them.
 - download_video_audio(): Downloads and preprocesses the audio from a YouTube video into an MP3 file.
 - delete_download(): Deletes the specified file or directory.
+- validity_checker(): Checks if the input link is a valid YouTube link and returns a boolean.
 
 Constants:
 - logger: Instance of logging to log messages.
@@ -183,8 +184,8 @@ def get_ydl_opts(external_logger=lambda x: None):
             "preferredcodec": "mp3",
             "preferredquality": "192",  # set the preferred bitrate to 192kbps
         }],
-        "logger":
-        MyLogger(external_logger),
+        # "logger":
+        # MyLogger(external_logger),
         "outtmpl":
         "./downloads/audio/%(title)s.%(ext)s",  # Set the output filename directly
         "progress_hooks": [my_hook],
@@ -283,3 +284,23 @@ def delete_download(path):
         print(f"File or directory not found: {path}")
     except Exception as e:
         print(f"An error occurred while trying to delete {path}: {str(e)}")
+
+
+def validity_checker(url):
+    """
+    Checks if the input link is a valid YouTube link and returns a boolean.
+    
+    This function checks if the input URL is a valid YouTube link. 
+    It uses the youtube_dl to match the expected patterns.
+
+    Args:
+        url (str): The URL to be checked.
+
+    Returns:
+        bool: True if the URL is a valid YouTube link, False otherwise.    
+    """
+    extractors = youtube_dl.extractor.gen_extractors()
+    for extractor in extractors:
+        if extractor.suitable(url) and extractor.IE_NAME != 'generic':
+            return True
+    return False

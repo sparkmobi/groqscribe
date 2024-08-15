@@ -12,6 +12,7 @@ Modules:
 - dotenv: For loading environment variables from a .env file.
 - download: For downloading and deleting audio files.
 - notes: For generating notes and transcript structure.
+- time: For working with time-related operations.
 
 Functions:
 - disable(): Disables certain features in the web interface.
@@ -39,10 +40,11 @@ import streamlit as st
 from groq import Groq
 import json
 import os
+import time
 from io import BytesIO
 # from md2pdf.core import md2pdf
 from dotenv import load_dotenv
-from download import download_video_audio, delete_download
+from download import download_video_audio, delete_download, validity_checker
 from notes import GenerationStatistics, NoteSection, generate_notes_structure, generate_section, create_markdown_file, create_pdf_file, transcribe_audio, generate_transcript_structure
 
 load_dotenv()
@@ -71,10 +73,10 @@ AUDIO_FILES = {
 
 # Model Options
 OUTLINE_MODEL_OPTIONS = [
-    "llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768", "gemma-7b-it"
+    "llama3-70b-8192", "llama3-8b-8192", "gemma2-9b-it", "gemma-7b-it"
 ]
 CONTENT_MODEL_OPTIONS = [
-    "llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it",
+    "llama3-8b-8192", "llama3-70b-8192", "llama-guard-3-8b", "gemma-7b-it",
     "gemma2-9b-it"
 ]
 
@@ -104,6 +106,10 @@ if 'notes' not in st.session_state:
     st.session_state.notes = None
 if 'transcript_notes' not in st.session_state:
     st.session_state.transcript_notes = None
+if 'youtube_link' not in st.session_state:
+    st.session_state.youtube_link = ""
+if 'valid_youtube_link' not in st.session_state:
+    st.session_state.valid_youtube_link = None
 
 # Main Page Content
 st.write("""
@@ -289,6 +295,20 @@ try:
                                           type=["mp3", "wav", "m4a"])
         else:
             youtube_link = st.text_input("Enter YouTube link:", "")
+            if youtube_link != st.session_state.youtube_link:
+                st.session_state.youtube_link = youtube_link
+                st.session_state.valid_youtube_link = validity_checker(
+                    youtube_link)
+
+            if st.session_state.valid_youtube_link:
+                message = st.success("Valid YouTube link")
+                time.sleep(3)
+                message.empty()
+            else:
+                message = st.warning("Invalid YouTube link")
+                time.sleep(3)
+                message.empty()
+                youtube_link = ""
 
         # Generate notes button
         submitted = st.form_submit_button(

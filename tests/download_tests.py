@@ -1,6 +1,6 @@
 import unittest
 import os
-from download import download_video_audio
+from download import download_video_audio, validity_checker
 
 
 class TestDownloadVideoAudio(unittest.TestCase):
@@ -8,6 +8,7 @@ class TestDownloadVideoAudio(unittest.TestCase):
     def setUp(self):
         self.url = 'https://www.youtube.com/watch?v=eduYP83eZwE'
         self.url_1 = 'https://www.youtube.com/watch?v=SZorAJ4I-sA'
+        self.url_2 = 'https://rumble.com/vo5ym1-why-is-this-2500-year-old-shipwreck-so-well-preserved.html'
         self.expected_file_extension = '.ogg'
         self.file_path = None
 
@@ -44,6 +45,12 @@ class TestDownloadVideoAudio(unittest.TestCase):
                 self.expected_file_extension)
         except Exception as e:
             self.fail(f"Test failed due to an unexpected exception: {e}")
+
+class TestValidityChecker(unittest.TestCase):
+    
+    def test_invalid_url(self):
+        url_1 = 'https://stackoverflow.com/questions/2685435/cooler-ascii-spinners'
+        self.assertTrue(validity_checker(url_1)) 
 
 
 if __name__ == '__main__':

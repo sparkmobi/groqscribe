@@ -5,7 +5,7 @@ This is the main file of ScribePlus.
 
 Modules:
 - streamlit: For creating the web interface.
-- groq: For interacting with the Groq API.
+- genai: For interacting with the Gemini API.
 - json: For handling JSON data.
 - os: For working with operating system commands.
 - io: For working with input/output operations.
@@ -13,6 +13,8 @@ Modules:
 - download: For downloading and deleting audio files.
 - notes: For generating notes and transcript structure.
 - time: For working with time-related operations.
+- py_tube: For interacting with the YouTube API.
+- youtube_transcript_api: For generating the YouTube transcript of a video id.
 
 Functions:
 - disable(): Disables certain features in the web interface.
@@ -37,19 +39,22 @@ Usage:
 """
 
 import streamlit as st
-from groq import Groq
 import json
 import os
 import time
+import requests
 from io import BytesIO
 # from md2pdf.core import md2pdf
 from dotenv import load_dotenv
+from py_youtube import Data
+from youtube_transcript_api import YouTubeTranscriptApi
+import google.generativeai as genai
 from download import download_video_audio, delete_download, validity_checker
 from notes import GenerationStatistics, NoteSection, generate_notes_structure, generate_section, create_markdown_file, create_pdf_file, transcribe_audio, generate_transcript_structure
 
 load_dotenv()
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 
 # Constants
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
@@ -71,15 +76,6 @@ AUDIO_FILES = {
     }
 }
 
-# Model Options
-OUTLINE_MODEL_OPTIONS = [
-    "llama3-70b-8192", "llama3-8b-8192", "gemma2-9b-it", "gemma-7b-it"
-]
-CONTENT_MODEL_OPTIONS = [
-    "llama3-8b-8192", "llama3-70b-8192", "llama-guard-3-8b", "gemma-7b-it",
-    "gemma2-9b-it"
-]
-
 # Streamlit Setup
 st.set_page_config(
     page_title="ScribePlus",
@@ -87,11 +83,10 @@ st.set_page_config(
 )
 
 # Session State Initialization
-if 'api_key' not in st.session_state:
-    st.session_state.api_key = GROQ_API_KEY
-if 'groq' not in st.session_state:
-    if GROQ_API_KEY:
-        st.session_state.groq = Groq()
+if 'genai' not in st.session_state:
+    if GOOGLE_API_KEY:
+        st.session_state.genai = genai
+        st.session_state.genai.configure(api_key=GOOGLE_API_KEY)
 if 'button_disabled' not in st.session_state:
     st.session_state.button_disabled = False
 if 'button_text' not in st.session_state:
@@ -110,6 +105,7 @@ if 'youtube_link' not in st.session_state:
     st.session_state.youtube_link = ""
 if 'valid_youtube_link' not in st.session_state:
     st.session_state.valid_youtube_link = None
+audio_file_path = None
 
 # Main Page Content
 st.write("""
@@ -163,7 +159,6 @@ def display_statistics():
 
 
 def stream_section_content(sections, transcription_text, notes,
-                           content_selected_model,
                            total_generation_statistics):
     """
     Recursively streams the content of each section in the notes structure.
@@ -180,8 +175,7 @@ def stream_section_content(sections, transcription_text, notes,
             content_stream = generate_section(
                 transcript=transcription_text,
                 existing_notes=notes.return_existing_contents(),
-                section=(title + ": " + content),
-                model=str(content_selected_model))
+                section=(title + ": " + content))
             for chunk in content_stream:
                 # Check if GenerationStatistics data is returned instead of str tokens
                 chunk_data = chunk
@@ -194,7 +188,6 @@ def stream_section_content(sections, transcription_text, notes,
                     st.session_state.notes.update_content(title, chunk)
         elif isinstance(content, dict):
             stream_section_content(content, transcription_text, notes,
-                                   content_selected_model,
                                    total_generation_statistics)
 
 
@@ -219,23 +212,6 @@ try:
             st.markdown(f"[Credit Youtube Link]({audio_info['youtube_link']})")
             st.write(f"\n\n")
 
-        st.write(f"---")
-
-        st.write(
-            "# Customization Settings\n🧪 These settings are experimental.\n")
-        st.write(
-            f"By default, ScribePlus uses Llama3-70b for generating the notes outline and Llama3-8b for the content. This balances quality with speed and rate limit usage. You can customize these selections below."
-        )
-        outline_selected_model = st.selectbox("Outline generation:",
-                                              OUTLINE_MODEL_OPTIONS)
-        content_selected_model = st.selectbox("Content generation:",
-                                              CONTENT_MODEL_OPTIONS)
-
-        # Add note about rate limits
-        st.info(
-            "Important: Different models have different token and rate limits which may cause runtime errors."
-        )
-
     # Main Content
     if st.button('End Generation and Download Notes'):
         if st.session_state.notes is not None:
@@ -254,6 +230,7 @@ try:
                 file_name=f'{st.session_state.notes_title}_notes.pdf',
                 mime='application/pdf')
             st.session_state.button_disabled = False
+            st.session_state.notes = None
         elif st.session_state.transcript_notes is not None:
             markdown_file = create_markdown_file(
                 st.session_state.transcript_notes.
@@ -261,16 +238,17 @@ try:
             st.download_button(
                 label='Download Text',
                 data=markdown_file,
-                file_name=f'{st.session_state.notes_title}_notes.txt',
+                file_name=f'{st.session_state.notes_title}_transcript.txt',
                 mime='text/plain')
             pdf_file = create_pdf_file(st.session_state.transcript_notes.
                                        get_transcript_markdown_content())
             st.download_button(
                 label='Download PDF',
                 data=pdf_file,
-                file_name=f'{st.session_state.notes_title}_notes.pdf',
+                file_name=f'{st.session_state.notes_title}_transcript.pdf',
                 mime='application/pdf')
             st.session_state.button_disabled = False
+            st.session_state.transcript_notes = None
         else:
             raise ValueError(
                 "Please generate content first before downloading the notes.")
@@ -280,15 +258,16 @@ try:
 
     audio_file = None
     youtube_link = None
-    groq_input_key = None
     audio_file_path = None
     notes = None
     transcript_notes = None
 
     with st.form("groqform"):
-        if not GROQ_API_KEY:
-            groq_input_key = st.text_input(
+        if not GOOGLE_API_KEY:
+            gemini_input_key = st.text_input(
                 "Enter your Groq API Key (gsk_yA...):", "", type="password")
+            gemini_input_key = genai.configure(api_key=GOOGLE_API_KEY)
+            st.session_state.genai = gemini_input_key
 
         if input_method == "Upload audio file":
             audio_file = st.file_uploader("Upload an audio file",
@@ -304,11 +283,6 @@ try:
                 message = st.success("Valid YouTube link")
                 time.sleep(3)
                 message.empty()
-            else:
-                message = st.warning("Invalid YouTube link")
-                time.sleep(3)
-                message.empty()
-                youtube_link = ""
 
         # Generate notes button
         submitted = st.form_submit_button(
@@ -335,6 +309,7 @@ try:
                     display_status("Downloading audio from YouTube link ....")
                     audio_file_path, audio_title = download_video_audio(
                         youtube_link, display_download_status)
+
                     if audio_file_path is None:
                         st.error(
                             "Failed to download audio from YouTube link. Please try again."
@@ -352,26 +327,34 @@ try:
                         audio_file.name = os.path.basename(
                             audio_file_path)  # Set the file name
                         st.session_state.notes_title = str(audio_title)
-                        delete_download(audio_file_path)
                     clear_download_status()
                 else:
                     raise ValueError("Invalid YouTube link. Please try again.")
 
-            if not GROQ_API_KEY:
-                st.session_state.groq = Groq(api_key=groq_input_key)
+            transcription_text = ""
+            try:
+                display_status("Transcribing audio...")
+                
+                transcription_text = transcribe_audio(audio_file_path)
+                delete_download(audio_file_path)
+                print(f'Transcription text is: {transcription_text}')
+                display_statistics()
+            except Exception as error:
+                st.error(f"An error occurred during transcription: {error}")
+                st.stop()
 
             if submitted:  # Generate notes
-                display_status("Transcribing audio in background....")
-                transcription_text = transcribe_audio(audio_file)
-                display_statistics()
-                display_status("Generating notes structure....")
-                large_model_generation_statistics, notes_structure = generate_notes_structure(
-                    transcription_text, model=str(outline_selected_model))
-                print("Structure: ", notes_structure)
-                display_status("Generating notes ...")
-                total_generation_statistics = GenerationStatistics(
-                    model_name=str(content_selected_model))
-                clear_status()
+                try:
+                    display_status("Generating notes structure...")
+                    large_model_generation_statistics, notes_structure = generate_notes_structure(
+                        transcription_text)
+                    print("Structure: ", notes_structure)
+                    display_status("Generating notes...")
+                    total_generation_statistics = GenerationStatistics()
+                    clear_status()
+                except Exception as error:
+                    st.error(f"An error occurred during generation: {error}")
+                    st.stop()
 
                 try:
                     notes_structure_json = json.loads(notes_structure)
@@ -382,7 +365,6 @@ try:
 
                     stream_section_content(notes_structure_json,
                                            transcription_text, notes,
-                                           content_selected_model,
                                            total_generation_statistics)
                 except json.JSONDecodeError:
                     st.error(
@@ -390,23 +372,14 @@ try:
                     )
                 enable()
             elif submitted_2:  # Generate transcript
-                display_status("Transcribing audio in background....")
-                transcription_text = transcribe_audio(audio_file)
-                st.session_state.statistics_text = "Transcribed audio successfully!"
-                display_statistics()
-                # st.markdown(f"## Transcript:\n{transcription_text}")
                 display_status("Generating transcript structure....")
                 _, notes_structure_1 = generate_notes_structure(
-                    transcription_text, model=str(outline_selected_model))
+                    transcription_text)
                 notes_structure_json = json.loads(notes_structure_1)
                 notes_sections = [title for title in notes_structure_json]
                 notes_structure_2 = generate_transcript_structure(
                     transcription_text, notes_sections)
                 notes_structure_json_2 = json.loads(notes_structure_2)
-                print(
-                    f'Structure is of {type(notes_structure_json_2)} in main.py'
-                )
-                # print("Structure: ", notes_structure_2)
                 transcript_notes = NoteSection(
                     structure=notes_structure_json_2,
                     transcript=transcription_text)
@@ -421,8 +394,9 @@ try:
 
 except Exception as e:
     st.session_state.button_disabled = False
-
-    if hasattr(e, 'status_code') and e.status_code == 413:
+    if isinstance(
+            e,
+            requests.exceptions.HTTPError) and e.response.status_code == 413:
         st.error(FILE_TOO_LARGE_MESSAGE)
     else:
         st.error(e)

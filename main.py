@@ -44,10 +44,7 @@ import os
 import time
 import requests
 from io import BytesIO
-# from md2pdf.core import md2pdf
 from dotenv import load_dotenv
-from py_youtube import Data
-from youtube_transcript_api import YouTubeTranscriptApi
 import google.generativeai as genai
 from download import download_video_audio, delete_download, validity_checker
 from notes import GenerationStatistics, NoteSection, generate_notes_structure, generate_section, create_markdown_file, create_pdf_file, transcribe_audio, generate_transcript_structure
@@ -175,7 +172,7 @@ def stream_section_content(sections, transcription_text, notes,
             content_stream = generate_section(
                 transcript=transcription_text,
                 existing_notes=notes.return_existing_contents(),
-                section=(title + ": " + content))
+                section=title)
             for chunk in content_stream:
                 # Check if GenerationStatistics data is returned instead of str tokens
                 chunk_data = chunk
@@ -334,7 +331,7 @@ try:
             transcription_text = ""
             try:
                 display_status("Transcribing audio...")
-                
+
                 transcription_text = transcribe_audio(audio_file_path)
                 delete_download(audio_file_path)
                 print(f'Transcription text is: {transcription_text}')
@@ -357,6 +354,8 @@ try:
                     st.stop()
 
                 try:
+                    notes_structure = notes_structure.strip("```json\n").strip(
+                        "```")
                     notes_structure_json = json.loads(notes_structure)
                     notes = NoteSection(structure=notes_structure_json,
                                         transcript=transcription_text)

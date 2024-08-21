@@ -173,7 +173,7 @@ class NoteSection:
         for title, content in structure.items():
             if self.contents[title].strip(
             ):  # Only include title if there is content
-                markdown_content += f"{'#' * level} {title}\n{self.contents[title]}.\n\n"
+                markdown_content += f"{'#' * level} {self.contents[title]}.\n\n"
             if isinstance(content, dict):
                 markdown_content += self.get_markdown_content(
                     content, level + 1)
@@ -219,15 +219,17 @@ def transcribe_audio(audio_file):
     Transcribes audio using Gemini's API.
     """
     ai_audio_file = st.session_state.genai.upload_file(path=audio_file)
-    prompt = "Your task is to listen to the audio and transcribe it. Please provide the transcript."
+    prompt = "Can you transcribe this interview?"
 
     model = st.session_state.genai.GenerativeModel(
-        'models/gemini-1.5-pro',
+        'models/gemini-1.0-pro',
         generation_config=st.session_state.genai.GenerationConfig(
             temperature=0.1))
 
-    results = model.generate_content([prompt, ai_audio_file])
-    print(f"Results: {results}")
+    results = model.generate_content([prompt, ai_audio_file],
+                                     safety_settings=CUSTOM_SAFETY_SETTINGS)
+    if not results.text:
+        print(f"Results: {results}")
     return results.text
 
 
@@ -269,7 +271,7 @@ def generate_section(transcript: str, existing_notes: str, section: str):
     Returns notes structure content as well as total tokens and total time for generation.
     """
     model = st.session_state.genai.GenerativeModel(
-        'models/gemini-1.0-pro',
+        'models/gemini-1.5-pro',
         system_instruction=
         "You are an expert writer. Generate a comprehensive note for the section provided based factually on the transcript provided. Do not repeat any content from previous sections. Avoid giving a premise before the section. Don't repeat section titles.",
         generation_config=st.session_state.genai.GenerationConfig(
@@ -288,8 +290,8 @@ def generate_section(transcript: str, existing_notes: str, section: str):
         if chunk.usage_metadata:
             usage = chunk.usage_metadata
             statistics_to_return = GenerationStatistics(
-                input_tokens=usage.prompt_tokens,
-                output_tokens=usage.completion_tokens)
+                input_tokens=usage.prompt_token_count,
+                output_tokens=usage.candidates_token_count)
             yield statistics_to_return
 
 
@@ -301,7 +303,7 @@ def generate_transcript_structure(transcript: str, sections: list):
 
     # Use the model to identify section boundaries in the transcript.
     model = st.session_state.genai.GenerativeModel(
-        'models/gemini-1.0-pro',
+        'models/gemini-1.5-pro',
         system_instruction=
         "You are a transcript editor. Identify the sections in the following transcript, preserving the original text.  Output a JSON object where each key is a section title from the provided list, and the value is the content of that section.",
         generation_config=st.session_state.genai.GenerationConfig(

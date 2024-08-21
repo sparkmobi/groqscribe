@@ -50,7 +50,7 @@ from notes import GenerationStatistics, NoteSection, generate_notes_structure, g
 
 load_dotenv()
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 # Constants
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
@@ -74,7 +74,7 @@ AUDIO_FILES = {
 
 # Model Options
 OUTLINE_MODEL_OPTIONS = [
-    "llama3-70b-8192", "llama3-8b-8192", "gemma2-9b-it", "gemma-7b-it"
+    "llama3-8b-8192", "llama3-70b-8192", "gemma2-9b-it", "gemma-7b-it"
 ]
 CONTENT_MODEL_OPTIONS = [
     "llama3-8b-8192", "llama3-70b-8192", "llama-guard-3-8b", "gemma-7b-it",
@@ -254,6 +254,7 @@ try:
                 data=pdf_file,
                 file_name=f'{st.session_state.notes_title}_notes.pdf',
                 mime='application/pdf')
+            st.session_state.notes = None
             st.session_state.button_disabled = False
         elif st.session_state.transcript_notes is not None:
             markdown_file = create_markdown_file(
@@ -271,6 +272,7 @@ try:
                 data=pdf_file,
                 file_name=f'{st.session_state.notes_title}_notes.pdf',
                 mime='application/pdf')
+            st.session_state.transcript_notes = None
             st.session_state.button_disabled = False
         else:
             raise ValueError(
@@ -305,11 +307,6 @@ try:
                 message = st.success("Valid YouTube link")
                 time.sleep(3)
                 message.empty()
-            else:
-                message = st.warning("Invalid YouTube link")
-                time.sleep(3)
-                message.empty()
-                youtube_link = ""
 
         # Generate notes button
         submitted = st.form_submit_button(
@@ -373,27 +370,43 @@ try:
                     except json.JSONDecodeError:
                         pass
 
-                if error_dict and 'error' in error_dict and 'code' in error_dict['error'] and error_dict['error']['code'] == 'rate_limit_exceeded':
+                if error_dict and 'error' in error_dict and 'code' in error_dict[
+                        'error'] and error_dict['error'][
+                            'code'] == 'rate_limit_exceeded':
                     if youtube_link:
                         try:
-                            display_status("Whisper API rate limit reached. Falling back to YouTube transcript...")
+                            display_status(
+                                "Whisper API rate limit reached. Falling back to YouTube transcript..."
+                            )
                             video_data = Data(youtube_link).data()
                             video_id = video_data['id']
-                            transcript = YouTubeTranscriptApi.get_transcript(video_id)
-                            transcription_text = " ".join([line['text'] for line in transcript])
-                            display_status("YouTube transcript retrieved successfully.")
+                            transcript = YouTubeTranscriptApi.get_transcript(
+                                video_id)
+                            transcription_text = " ".join(
+                                [line['text'] for line in transcript])
+                            display_status(
+                                "YouTube transcript retrieved successfully.")
                         except Exception as yt_error:
-                            st.error(f"Failed to retrieve Youtube Transcript. Error: {yt_error}")
+                            st.error(
+                                f"Failed to retrieve Youtube Transcript. Error: {yt_error}"
+                            )
                             st.stop()
                     else:
-                        st.error("Rate limit reached and no YouTube link provided for fallback.")
+                        st.error(
+                            "Rate limit reached and no YouTube link provided for fallback."
+                        )
                         st.stop()
                 else:
-                    st.error(f"An error occurred during transcription: {str(error)}")
+                    st.error(
+                        f"An error occurred during transcription: {str(error)}"
+                    )
                     st.stop()
-            
+
             if submitted:  # Generate notes
                 display_status("Generating notes structure....")
+                print(
+                    f'Length of the transcription is: {len(transcription_text)}'
+                )
                 large_model_generation_statistics, notes_structure = generate_notes_structure(
                     transcription_text, model=str(outline_selected_model))
                 print("Structure: ", notes_structure)

@@ -47,7 +47,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
+MAX_FILE_SIZE = 20 * 1024 * 1024  # 25 MB
 FILE_TOO_LARGE_MESSAGE = "The audio file is too large for the current size and rate limits using Whisper. If you used a YouTube link, please try a shorter video clip. If you uploaded an audio file, try trimming or compressing the audio to under 25 MB."
 max_retries = 3
 delay = 2
@@ -244,6 +244,7 @@ def download_video_audio(url, external_logger=lambda x: None):
                                  'Video with ID: ' + info.get('id', 'unknown'))
             mp3_filename = os.path.splitext(filename)[0] + '.mp3'
             mp3_filetitle = re.sub(r'[\\/:*?"<>|]', '', filetitle)
+            print(f'Filesize: {filesize}')
             if filesize > MAX_FILE_SIZE:
                 mp3_filename = handle_large_file(filesize, MAX_FILE_SIZE, ydl,
                                                  info)

@@ -42,7 +42,8 @@ import json
 import os
 import time
 from io import BytesIO
-# from md2pdf.core import md2pdf
+from py_youtube import Data
+from youtube_transcript_api import YouTubeTranscriptApi
 from dotenv import load_dotenv
 from download import download_video_audio, delete_download, validity_checker
 from notes import GenerationStatistics, NoteSection, generate_notes_structure, generate_section, create_markdown_file, create_pdf_file, transcribe_audio, generate_transcript_structure
@@ -360,10 +361,38 @@ try:
             if not GROQ_API_KEY:
                 st.session_state.groq = Groq(api_key=groq_input_key)
 
-            if submitted:  # Generate notes
-                display_status("Transcribing audio in background....")
+            try:
+                display_status("Transcribing audio...")
                 transcription_text = transcribe_audio(audio_file)
                 display_statistics()
+            except Exception as error:
+                error_dict = None
+                if hasattr(error, 'response') and error.response is not None:
+                    try:
+                        error_dict = json.loads(error.response.text)
+                    except json.JSONDecodeError:
+                        pass
+
+                if error_dict and 'error' in error_dict and 'code' in error_dict['error'] and error_dict['error']['code'] == 'rate_limit_exceeded':
+                    if youtube_link:
+                        try:
+                            display_status("Whisper API rate limit reached. Falling back to YouTube transcript...")
+                            video_data = Data(youtube_link).data()
+                            video_id = video_data['id']
+                            transcript = YouTubeTranscriptApi.get_transcript(video_id)
+                            transcription_text = " ".join([line['text'] for line in transcript])
+                            display_status("YouTube transcript retrieved successfully.")
+                        except Exception as yt_error:
+                            st.error(f"Failed to retrieve Youtube Transcript. Error: {yt_error}")
+                            st.stop()
+                    else:
+                        st.error("Rate limit reached and no YouTube link provided for fallback.")
+                        st.stop()
+                else:
+                    st.error(f"An error occurred during transcription: {str(error)}")
+                    st.stop()
+            
+            if submitted:  # Generate notes
                 display_status("Generating notes structure....")
                 large_model_generation_statistics, notes_structure = generate_notes_structure(
                     transcription_text, model=str(outline_selected_model))
@@ -390,11 +419,6 @@ try:
                     )
                 enable()
             elif submitted_2:  # Generate transcript
-                display_status("Transcribing audio in background....")
-                transcription_text = transcribe_audio(audio_file)
-                st.session_state.statistics_text = "Transcribed audio successfully!"
-                display_statistics()
-                # st.markdown(f"## Transcript:\n{transcription_text}")
                 display_status("Generating transcript structure....")
                 _, notes_structure_1 = generate_notes_structure(
                     transcription_text, model=str(outline_selected_model))

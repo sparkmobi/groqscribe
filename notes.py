@@ -20,10 +20,11 @@ Functions:
 - generate_section():
 - generate_transcript_structure():
 """
-
+import json
 import streamlit as st
 from io import BytesIO
 from md2pdf.core import md2pdf
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 class GenerationStatistics:
@@ -134,7 +135,6 @@ class NoteSection:
 
     def flatten_structure(self, structure):
         sections = []
-        print(f'Structure is of {type(structure)} in flatten_structure')
         for title, content in structure.items():
             sections.append(title)
             if isinstance(content, dict):
@@ -258,6 +258,43 @@ def transcribe_audio(audio_file):
     return results
 
 
+def create_chunks(transcript, chunk_size=3000, chunk_overlap=200):
+    """
+    """
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size,
+                                                   chunk_overlap=chunk_overlap,
+                                                   length_function=len,
+                                                   is_separator_regex=False)
+    texts = text_splitter.split_text(transcript)
+    return texts
+
+
+def merge_json_structures(json_objects):
+    """
+    Merges multiple JSON structures into a single structure, using their index as keys.
+    Args:
+        - json_objects (list): A list of JSON objects or JSON strings.
+
+    Returns:
+        - dict: A dictionary where keys are indices and values are the corresponding JSON objects.
+    """
+    merged_structure = {}
+    for i, chunk in enumerate(json_objects):
+        try:
+            if isinstance(chunk, str):
+                chunk_json = json.loads(chunk)
+            elif isinstance(chunk, dict):
+                chunk_json = chunk
+            else:
+                raise ValueError(f"Unsupported type for chunk {type(chunk)}")
+            merged_structure[i] = chunk_json
+        except json.JSONDecodeError as e:
+            print(f"Error decoding JSON: {e}")
+        except Exception as e:
+            print(f"Error processing chunk {i}: {e}")
+    return merged_structure
+
+
 def generate_notes_structure(transcript: str, model: str = "llama3-70b-8192"):
     """
     Returns notes structure content as well as total tokens and total time for generation.
@@ -267,23 +304,15 @@ def generate_notes_structure(transcript: str, model: str = "llama3-70b-8192"):
 "Introduction": "Introduction to the AMA session, including the topic of Groq scaling architecture and the panelists",
 "Panelist Introductions": "Brief introductions from Igor, Andrew, and Omar, covering their backgrounds and roles at Groq",
 "Groq Scaling Architecture Overview": "High-level overview of Groq's scaling architecture, covering hardware, software, and cloud components",
-"Hardware Perspective": "Igor's overview of Groq's hardware approach, using an analogy of city traffic management to explain the traditional compute approach and Groq's innovative approach",
-"Traditional Compute": "Description of traditional compute approach, including asynchronous nature, queues, and poor utilization of infrastructure",
-"Groq's Approach": "Description of Groq's approach, including pre-orchestrated movement of data, low latency, high energy efficiency, and high utilization of resources",
-"Hardware Implementation": "Igor's explanation of the hardware implementation, including a comparison of GPU and LPU architectures"
-}"""
+"Hardware Perspective": "Igor's overview of Groq's hardware approach, using an analogy of city traffic management to explain the traditional compute approach and Groq's innovative approach"
+"""
     completion = st.session_state.groq.chat.completions.create(
         model=model,
         messages=[{
             "role":
-            "system",
-            "content":
-            "Write in JSON format:\n\n{\"Title of section goes here\":\"Description of section goes here\",\"Title of section goes here\":\"Description of section goes here\",\"Title of section goes here\":\"Description of section goes here\"}"
-        }, {
-            "role":
             "user",
             "content":
-            f"### Transcript {transcript}\n\n### Example\n\n{shot_example}\n\n### Instructions\n\nCreate a structure for comprehensive notes on the above transcribed audio. Section titles and content descriptions must be comprehensive. Quality over quantity. Don't include any additional information."
+            f"### Transcript {transcript}\n\n### Example\n\n{shot_example}\n\n### Instructions\n\nYour task is to create a JSON structure of section title to content description like in the example for the above transcribed audio. Section titles and content descriptions must be comprehensive. Quality over quantity. Don't include any additional information."
         }],
         temperature=0.3,
         max_tokens=8000,

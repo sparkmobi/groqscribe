@@ -244,7 +244,6 @@ def download_video_audio(url, external_logger=lambda x: None):
                                  'Video with ID: ' + info.get('id', 'unknown'))
             mp3_filename = os.path.splitext(filename)[0] + '.mp3'
             mp3_filetitle = re.sub(r'[\\/:*?"<>|]', '', filetitle)
-            print(f'Filesize: {filesize}')
             if filesize > MAX_FILE_SIZE:
                 mp3_filename = handle_large_file(filesize, MAX_FILE_SIZE, ydl,
                                                  info)

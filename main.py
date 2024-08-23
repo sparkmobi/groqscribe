@@ -46,7 +46,7 @@ from py_youtube import Data
 from youtube_transcript_api import YouTubeTranscriptApi
 from dotenv import load_dotenv
 from download import download_video_audio, delete_download, validity_checker
-from notes import GenerationStatistics, NoteSection, generate_notes_structure, generate_section, create_markdown_file, create_pdf_file, transcribe_audio, generate_transcript_structure
+from notes import GenerationStatistics, NoteSection, generate_notes_structure, generate_section, create_markdown_file, create_pdf_file, transcribe_audio, generate_transcript_structure, merge_json_structures, create_chunks
 
 load_dotenv()
 
@@ -54,6 +54,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 # Constants
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
+MAX_TEXT_LENGTH = 18000
 FILE_TOO_LARGE_MESSAGE = "The audio file is too large for the current size and rate limits using Whisper. If you used a YouTube link, please try a shorter video clip. If you uploaded an audio file, try trimming or compressing the audio to under 25 MB."
 
 # Sample Audio Files
@@ -74,11 +75,11 @@ AUDIO_FILES = {
 
 # Model Options
 OUTLINE_MODEL_OPTIONS = [
-    "llama3-8b-8192", "llama3-70b-8192", "gemma2-9b-it", "gemma-7b-it"
+    "gemma2-9b-it", "llama3-8b-8192", "llama3-70b-8192", "gemma-7b-it"
 ]
 CONTENT_MODEL_OPTIONS = [
-    "llama3-8b-8192", "llama3-70b-8192", "llama-guard-3-8b", "gemma-7b-it",
-    "gemma2-9b-it"
+    "llama3-8b-8192", "gemma2-9b-it", "llama3-70b-8192", "llama-guard-3-8b",
+    "gemma-7b-it"
 ]
 
 # Streamlit Setup
@@ -178,9 +179,15 @@ def stream_section_content(sections, transcription_text, notes,
     """
     for title, content in sections.items():
         if isinstance(content, str):
+            if len(notes.return_existing_contents()) > MAX_TEXT_LENGTH:
+                notes_text = notes.return_existing_contents(
+                )[-MAX_TEXT_LENGTH:]
+            else:
+                notes_text = notes.return_existing_contents()
+            time.sleep(10)
             content_stream = generate_section(
                 transcript=transcription_text,
-                existing_notes=notes.return_existing_contents(),
+                existing_notes=notes_text,
                 section=(title + ": " + content),
                 model=str(content_selected_model))
             for chunk in content_stream:
@@ -404,11 +411,24 @@ try:
 
             if submitted:  # Generate notes
                 display_status("Generating notes structure....")
-                print(
-                    f'Length of the transcription is: {len(transcription_text)}'
-                )
-                large_model_generation_statistics, notes_structure = generate_notes_structure(
-                    transcription_text, model=str(outline_selected_model))
+                transcription_chunks = []
+                if len(transcription_text) > MAX_TEXT_LENGTH:
+                    transcription_chunks = create_chunks(transcription_text)
+                    stats_0 = GenerationStatistics(
+                        model_name=str(outline_selected_model))
+                    chunk_results = []
+                    for chunk in transcription_chunks:
+                        print("The length of the chunk is {}".format(
+                            len(chunk)))
+                        time.sleep(15)
+                        stats, result = generate_notes_structure(
+                            chunk, model=str(outline_selected_model))
+                        chunk_results.append(result)
+                        stats_0.add(stats)
+                    notes_structure = merge_json_structures(chunk_results)
+                else:
+                    large_model_generation_statistics, notes_structure = generate_notes_structure(
+                        transcription_text, model=str(outline_selected_model))
                 print("Structure: ", notes_structure)
                 display_status("Generating notes ...")
                 total_generation_statistics = GenerationStatistics(
@@ -416,16 +436,27 @@ try:
                 clear_status()
 
                 try:
-                    notes_structure_json = json.loads(notes_structure)
+                    if isinstance(notes_structure, str):
+                        notes_structure_json = json.loads(notes_structure)
+                    else:
+                        notes_structure_json = notes_structure
                     notes = NoteSection(structure=notes_structure_json,
                                         transcript=transcription_text)
                     st.session_state.notes = notes
                     st.session_state.notes.display_structure()
-
-                    stream_section_content(notes_structure_json,
-                                           transcription_text, notes,
-                                           content_selected_model,
-                                           total_generation_statistics)
+                    if len(transcription_text) > MAX_TEXT_LENGTH:
+                        for chunk in transcription_chunks:
+                            for index, content in notes_structure_json.items():
+                                time.sleep(15)
+                                stream_section_content(
+                                    content, chunk, notes,
+                                    content_selected_model,
+                                    total_generation_statistics)
+                    else:
+                        stream_section_content(notes_structure_json,
+                                               transcription_text, notes,
+                                               content_selected_model,
+                                               total_generation_statistics)
                 except json.JSONDecodeError:
                     st.error(
                         "Failed to decode the notes structure. Please try again."

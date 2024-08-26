@@ -78,7 +78,7 @@ OUTLINE_MODEL_OPTIONS = [
     "gemma2-9b-it", "llama3-8b-8192", "llama3-70b-8192", "gemma-7b-it"
 ]
 CONTENT_MODEL_OPTIONS = [
-    "llama3-8b-8192", "gemma2-9b-it", "llama3-70b-8192", "llama-guard-3-8b",
+    "llama3-70b-8192", "gemma2-9b-it", "llama3-8b-8192", "llama-guard-3-8b",
     "gemma-7b-it"
 ]
 
@@ -366,6 +366,7 @@ try:
                 st.session_state.groq = Groq(api_key=groq_input_key)
 
             try:
+                whisper_failed = False
                 display_status("Transcribing audio...")
                 transcription_text = transcribe_audio(audio_file)
                 display_statistics()
@@ -380,6 +381,7 @@ try:
                 if error_dict and 'error' in error_dict and 'code' in error_dict[
                         'error'] and error_dict['error'][
                             'code'] == 'rate_limit_exceeded':
+                    whisper_failed = True
                     if youtube_link:
                         try:
                             display_status(
@@ -400,8 +402,7 @@ try:
                             st.stop()
                     else:
                         st.error(
-                            "Rate limit reached and no YouTube link provided for fallback."
-                        )
+                            "Rate limit reached and no fallback available.")
                         st.stop()
                 else:
                     st.error(
@@ -412,7 +413,8 @@ try:
             if submitted:  # Generate notes
                 display_status("Generating notes structure....")
                 transcription_chunks = []
-                if len(transcription_text) > MAX_TEXT_LENGTH:
+                if len(transcription_text
+                       ) > MAX_TEXT_LENGTH and whisper_failed:
                     transcription_chunks = create_chunks(transcription_text)
                     stats_0 = GenerationStatistics(
                         model_name=str(outline_selected_model))
@@ -445,13 +447,16 @@ try:
                     st.session_state.notes = notes
                     st.session_state.notes.display_structure()
                     if len(transcription_text) > MAX_TEXT_LENGTH:
-                        for chunk in transcription_chunks:
-                            for index, content in notes_structure_json.items():
-                                time.sleep(15)
-                                stream_section_content(
-                                    content, chunk, notes,
-                                    content_selected_model,
-                                    total_generation_statistics)
+                        for i in range(len(transcription_chunks)):
+                            for section_index, section_content in notes_structure_json.items(
+                            ):
+                                if i == section_index:
+                                    time.sleep(15)
+                                    stream_section_content(
+                                        section_content,
+                                        transcription_chunks[i], notes,
+                                        content_selected_model,
+                                        total_generation_statistics)
                     else:
                         stream_section_content(notes_structure_json,
                                                transcription_text, notes,
@@ -464,8 +469,24 @@ try:
                 enable()
             elif submitted_2:  # Generate transcript
                 display_status("Generating transcript structure....")
-                _, notes_structure_1 = generate_notes_structure(
-                    transcription_text, model=str(outline_selected_model))
+                transcription_chunks = []
+                if len(transcription_text) > MAX_TEXT_LENGTH:
+                    transcription_chunks = create_chunks(transcription_text)
+                    stats_0 = GenerationStatistics(
+                        model_name=str(outline_selected_model))
+                    chunk_results = []
+                    for chunk in transcription_chunks:
+                        print("The length of the chunk is {}".format(
+                            len(chunk)))
+                        time.sleep(15)
+                        stats, result = generate_notes_structure(
+                            chunk, model=str(outline_selected_model))
+                        chunk_results.append(result)
+                        stats_0.add(stats)
+                    notes_structure_1 = merge_json_structures(chunk_results)
+                else:
+                    large_model_generation_statistics, notes_structure_1 = generate_notes_structure(
+                        transcription_text, model=str(outline_selected_model))
                 notes_structure_json = json.loads(notes_structure_1)
                 notes_sections = [title for title in notes_structure_json]
                 notes_structure_2 = generate_transcript_structure(
@@ -493,7 +514,7 @@ except Exception as e:
     if hasattr(e, 'status_code') and e.status_code == 413:
         st.error(FILE_TOO_LARGE_MESSAGE)
     else:
-        st.error(e)
+        st.error(e.message)
 
     if st.button("Clear"):
         st.rerun()

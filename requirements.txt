@@ -75,3 +75,4 @@ zopfli==0.2.3
 py-youtube
 youtube-transcript-api
 langchain-text-splitters
+semantic-text-splitter

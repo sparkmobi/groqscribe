@@ -24,7 +24,8 @@ import json
 import streamlit as st
 from io import BytesIO
 from md2pdf.core import md2pdf
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+#from langchain_text_splitters import RecursiveCharacterTextSplitter
+from semantic_text_splitter import TextSplitter
 
 
 class GenerationStatistics:
@@ -261,11 +262,9 @@ def transcribe_audio(audio_file):
 def create_chunks(transcript, chunk_size=3000, chunk_overlap=200):
     """
     """
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size,
-                                                   chunk_overlap=chunk_overlap,
-                                                   length_function=len,
-                                                   is_separator_regex=False)
-    texts = text_splitter.split_text(transcript)
+    splitter = TextSplitter.from_tiktoken_model("gpt-3.5-turbo", chunk_size)
+
+    texts = splitter.chunks(transcript)
     return texts
 
 

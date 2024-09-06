@@ -78,7 +78,7 @@ OUTLINE_MODEL_OPTIONS = [
     "gemma2-9b-it", "llama3-8b-8192", "llama3-70b-8192", "gemma-7b-it"
 ]
 CONTENT_MODEL_OPTIONS = [
-    "llama3-70b-8192", "gemma2-9b-it", "llama3-8b-8192", "llama-guard-3-8b",
+    "llama3-8b-8192", "gemma2-9b-it", "llama3-70b-8192", "llama-guard-3-8b",
     "gemma-7b-it"
 ]
 
@@ -232,7 +232,7 @@ try:
         st.write(
             "# Customization Settings\n🧪 These settings are experimental.\n")
         st.write(
-            f"By default, ScribePlus uses Llama3-70b for generating the notes outline and Llama3-8b for the content. This balances quality with speed and rate limit usage. You can customize these selections below."
+            f"By default, ScribePlus uses gemma2 for generating the notes outline and Llama3 for the content. This balances quality with speed and rate limit usage. You can customize these selections below."
         )
         outline_selected_model = st.selectbox("Outline generation:",
                                               OUTLINE_MODEL_OPTIONS)
@@ -270,14 +270,14 @@ try:
             st.download_button(
                 label='Download Text',
                 data=markdown_file,
-                file_name=f'{st.session_state.notes_title}_notes.txt',
+                file_name=f'{st.session_state.notes_title}_transcript.txt',
                 mime='text/plain')
             pdf_file = create_pdf_file(st.session_state.transcript_notes.
                                        get_transcript_markdown_content())
             st.download_button(
                 label='Download PDF',
                 data=pdf_file,
-                file_name=f'{st.session_state.notes_title}_notes.pdf',
+                file_name=f'{st.session_state.notes_title}_transcript.pdf',
                 mime='application/pdf')
             st.session_state.transcript_notes = None
             st.session_state.button_disabled = False
@@ -413,8 +413,7 @@ try:
             if submitted:  # Generate notes
                 display_status("Generating notes structure....")
                 transcription_chunks = []
-                if len(transcription_text
-                       ) > MAX_TEXT_LENGTH and whisper_failed:
+                if len(transcription_text) > MAX_TEXT_LENGTH or whisper_failed:
                     transcription_chunks = create_chunks(transcription_text)
                     stats_0 = GenerationStatistics(
                         model_name=str(outline_selected_model))
@@ -518,11 +517,12 @@ except Exception as e:
 
     if hasattr(e, 'status_code') and e.status_code == 413:
         st.error(FILE_TOO_LARGE_MESSAGE)
+    elif hasattr(e, 'status_code') and e.status_code == 400:
+        st.error(FILE_TOO_LARGE_MESSAGE)
     else:
         e_dict = json.loads(e)
-        if 'error' in e_dict and 'code' in e_dict['error'] and e_dict['error'][
-                'code'] == 'rate_limit_exceeded':
-            print(f"Error: {e_dict['error']['message']}")
+        if 'error' in e_dict and 'code' in e_dict['error']:
+            print(f"Error: {e_dict['error']['code']}")
         st.error(f"An error occurred: {str(e)}")
 
     if st.button("Clear"):

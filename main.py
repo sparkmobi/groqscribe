@@ -54,7 +54,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 # Constants
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
-MAX_TEXT_LENGTH = 18000
+MAX_TEXT_LENGTH = 25000
 FILE_TOO_LARGE_MESSAGE = "The audio file is too large for the current size and rate limits using Whisper. If you used a YouTube link, please try a shorter video clip. If you uploaded an audio file, try trimming or compressing the audio to under 25 MB."
 
 # Sample Audio Files
@@ -427,7 +427,7 @@ try:
                             chunk, model=str(outline_selected_model))
                         chunk_results.append(result)
                         stats_0.add(stats)
-                    notes_structure = merge_json_structures(chunk_results)
+                    notes_structure, _ = merge_json_structures(chunk_results)
                 else:
                     large_model_generation_statistics, notes_structure = generate_notes_structure(
                         transcription_text, model=str(outline_selected_model))
@@ -471,24 +471,29 @@ try:
                 display_status("Generating transcript structure....")
                 transcription_chunks = []
                 if len(transcription_text) > MAX_TEXT_LENGTH:
-                    transcription_chunks = create_chunks(transcription_text)
-                    stats_0 = GenerationStatistics(
-                        model_name=str(outline_selected_model))
-                    chunk_results = []
-                    for chunk in transcription_chunks:
-                        print("The length of the chunk is {}".format(
-                            len(chunk)))
-                        time.sleep(15)
-                        stats, result = generate_notes_structure(
-                            chunk, model=str(outline_selected_model))
-                        chunk_results.append(result)
-                        stats_0.add(stats)
-                    notes_structure_1 = merge_json_structures(chunk_results)
+                    # transcription_chunks = create_chunks(transcription_text)
+                    # stats_0 = GenerationStatistics(
+                    #     model_name=str(outline_selected_model))
+                    # chunk_results = []
+                    # for chunk in transcription_chunks:
+                    #     print("The length of the chunk is {}".format(
+                    #         len(chunk)))
+                    #     time.sleep(15)
+                    #     stats, result = generate_notes_structure(
+                    #         chunk, model=str(outline_selected_model))
+                    #     chunk_results.append(result)
+                    #     stats_0.add(stats)
+                    # notes_structure_json, notes_sections = merge_json_structures(chunk_results)
+                    large_model_generation_statistics, notes_structure_1 = generate_notes_structure(
+                        transcription_text[-MAX_TEXT_LENGTH:],
+                        model=str(outline_selected_model))
+                    notes_structure_json = json.loads(notes_structure_1)
+                    notes_sections = [title for title in notes_structure_json]
                 else:
                     large_model_generation_statistics, notes_structure_1 = generate_notes_structure(
                         transcription_text, model=str(outline_selected_model))
-                notes_structure_json = json.loads(notes_structure_1)
-                notes_sections = [title for title in notes_structure_json]
+                    notes_structure_json = json.loads(notes_structure_1)
+                    notes_sections = [title for title in notes_structure_json]
                 notes_structure_2 = generate_transcript_structure(
                     transcription_text, notes_sections)
                 notes_structure_json_2 = json.loads(notes_structure_2)
@@ -514,7 +519,11 @@ except Exception as e:
     if hasattr(e, 'status_code') and e.status_code == 413:
         st.error(FILE_TOO_LARGE_MESSAGE)
     else:
-        st.error(e.message)
+        e_dict = json.loads(e)
+        if 'error' in e_dict and 'code' in e_dict['error'] and e_dict['error'][
+                'code'] == 'rate_limit_exceeded':
+            print(f"Error: {e_dict['error']['message']}")
+        st.error(f"An error occurred: {str(e)}")
 
     if st.button("Clear"):
         st.rerun()

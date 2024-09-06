@@ -277,8 +277,10 @@ def merge_json_structures(json_objects):
 
     Returns:
         - dict: A dictionary where keys are indices and values are the corresponding JSON objects.
+        - list: A list of each chunks keys (titles).
     """
     merged_structure = {}
+    merged_keys = []
     for i, chunk in enumerate(json_objects):
         try:
             if isinstance(chunk, str):
@@ -287,12 +289,14 @@ def merge_json_structures(json_objects):
                 chunk_json = chunk
             else:
                 raise ValueError(f"Unsupported type for chunk {type(chunk)}")
+            for key, value in chunk_json.items():
+                merged_keys.append(key)
             merged_structure[i] = chunk_json
         except json.JSONDecodeError as e:
             print(f"Error decoding JSON: {e}")
         except Exception as e:
             print(f"Error processing chunk {i}: {e}")
-    return merged_structure
+    return merged_structure, merged_keys
 
 
 def generate_notes_structure(transcript: str, model: str = "llama3-70b-8192"):

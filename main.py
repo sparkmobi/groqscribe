@@ -55,7 +55,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 # Constants
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
 MAX_TEXT_LENGTH = 25000
-FILE_TOO_LARGE_MESSAGE = "The audio file is too large for the current size and rate limits using Whisper. If you used a YouTube link, please try a shorter video clip. If you uploaded an audio file, try trimming or compressing the audio to under 25 MB."
+FILE_TOO_LARGE_MESSAGE = "The audio file is too large for the current size and rate limits using the LLM. If you used a YouTube link, please try a shorter video clip. If you uploaded an audio file, try trimming or compressing the audio to under 25 MB."
 
 # Sample Audio Files
 AUDIO_FILES = {
@@ -520,10 +520,10 @@ except Exception as e:
     elif hasattr(e, 'status_code') and e.status_code == 400:
         st.error(FILE_TOO_LARGE_MESSAGE)
     else:
-        e_dict = json.loads(e)
+        e_dict = json.loads(e.response.text)
         if 'error' in e_dict and 'code' in e_dict['error']:
             print(f"Error: {e_dict['error']['code']}")
-        st.error(f"An error occurred: {str(e)}")
+        st.error(f"An error occurred: {str(e.status_code)}")
 
     if st.button("Clear"):
         st.rerun()

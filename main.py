@@ -520,10 +520,7 @@ except Exception as e:
     elif hasattr(e, 'status_code') and e.status_code == 400:
         st.error(FILE_TOO_LARGE_MESSAGE)
     else:
-        e_dict = json.loads(e.response.text)
-        if 'error' in e_dict and 'code' in e_dict['error']:
-            print(f"Error: {e_dict['error']['code']}")
-        st.error(f"An error occurred: {str(e.status_code)}")
+        st.error(f"An error occurred: Error code {str(e.status_code)}")
 
     if st.button("Clear"):
         st.rerun()

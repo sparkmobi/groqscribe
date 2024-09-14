@@ -78,7 +78,7 @@ OUTLINE_MODEL_OPTIONS = [
     "llama-3.1-70b-versatile", "llama3-8b-8192", "llama3-70b-8192", "gemma-7b-it"
 ]
 CONTENT_MODEL_OPTIONS = [
-    "llama3-8b-8192", "gemma2-9b-it", "llama3-70b-8192", "llama-guard-3-8b",
+    "llama-3.1-8b-instant", "gemma2-9b-it", "llama3-70b-8192", "llama-guard-3-8b",
     "gemma-7b-it"
 ]
 

@@ -298,7 +298,7 @@ def merge_json_structures(json_objects):
     return merged_structure, merged_keys
 
 
-def generate_notes_structure(transcript: str, model: str = "llama3-70b-8192"):
+def generate_notes_structure(transcript: str, model: str = "llama-3.1-70b-versatile"):
     """
     Returns notes structure content as well as total tokens and total time for generation.
     """
@@ -315,7 +315,7 @@ def generate_notes_structure(transcript: str, model: str = "llama3-70b-8192"):
             "role":
             "user",
             "content":
-            f"### Transcript {transcript}\n\n### Example\n\n{shot_example}\n\n### Instructions\n\nYour task is to create a JSON structure of section title to content description like in the example for the above transcribed audio. Section titles and content descriptions must be comprehensive. Quality over quantity. Don't include any additional information."
+            f"### Transcript {transcript}\n\n### Example\n\n{shot_example}\n\n### Instructions\n\nYour task is to create a JSON structure of section title to content description like in the example for the above transcribed audio. Section titles and content descriptions must be comprehensive. Quality over quantity. Don't include any additional information. Make sure that you generate it with the same transcribed audio language"
         }],
         temperature=0.3,
         max_tokens=8000,
@@ -340,7 +340,7 @@ def generate_notes_structure(transcript: str, model: str = "llama3-70b-8192"):
 def generate_section(transcript: str,
                      existing_notes: str,
                      section: str,
-                     model: str = "llama3-8b-8192"):
+                     model: str = "llama-3.1-8b-instant"):
     """
     Returns notes structure content as well as total tokens and total time for generation.
     """
@@ -350,12 +350,12 @@ def generate_section(transcript: str,
             "role":
             "system",
             "content":
-            "You are an expert writer. Generate a comprehensive note for the section provided based factually on the transcript provided. Do *not* repeat any content from previous sections. Avoid giving a premise before the section. Don't repeat section titles."
+            "You are an expert writer. Generate a comprehensive note for the section provided based factually on the transcript provided. Do *not* repeat any content from previous sections. Avoid giving a premise before the section. Don't repeat section titles. Make sure that you generate it with the same transcribed audio language"
         }, {
             "role":
             "user",
             "content":
-            f"### Transcript\n\n{transcript}\n\n### Existing Notes\n\n{existing_notes}\n\n### Instructions\n\nGenerate comprehensive notes for this section only based on the transcript: \n\n{section}."
+            f"### Transcript\n\n{transcript}\n\n### Existing Notes\n\n{existing_notes}\n\n### Instructions\n\nGenerate comprehensive notes for this section only based on the transcript: \n\n{section}. Make sure that you generate it with the same transcribed audio language"
         }],
         temperature=0.3,
         max_tokens=8000,
